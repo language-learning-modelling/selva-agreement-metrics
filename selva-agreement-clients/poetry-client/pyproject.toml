@@ -9,6 +9,7 @@ readme = "README.md"
 python = "^3.11"
 llm-agreement-metrics = {path = "../../llm-agreement-metrics"}
 jupyter = "^1.0.0"
+plotext = "^5.2.8"
 
 
 [tool.poetry.group.docs.dependencies]
