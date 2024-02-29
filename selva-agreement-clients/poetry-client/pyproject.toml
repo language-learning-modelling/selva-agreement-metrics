@@ -1,0 +1,19 @@
+[tool.poetry]
+name = "poetry-client"
+version = "0.1.0"
+description = ""
+authors = ["bernardo"]
+readme = "README.md"
+
+[tool.poetry.dependencies]
+python = "^3.11"
+llm-agreement-metrics = {path = "../../llm-agreement-metrics"}
+jupyter = "^1.0.0"
+
+
+[tool.poetry.group.docs.dependencies]
+mkdocs = "^1.5.3"
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
