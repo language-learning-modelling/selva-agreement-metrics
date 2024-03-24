@@ -1,0 +1,10 @@
+{
+    "9532352": {
+        "maskedSentenceStr": "[MASK] Artificial Intelligence ( AI ) improves the diagnosis of cancers and the medicine has understood it in the image of the Parisian Hospital of Pitier Salp tri re which quickly adopted iBiopsy . This artificial intelligence platform revolutionizes the treatment of pathologies including liver cancer . Medical imaging methods combined with deep learning and big data analytics help to better extract biomarkers from the progression of the disease . The plateforme Big data IBiopsy increase the proditive value of targeted therapy and strengthen the high precision m dicine . The objective of this AI is to improve the patient s diagnosis and the care of his cancer . I think it s a great advance for the research of cancer . Moreover Artificial intelligence will make it possible to switch to a more preventive m dicine .",
+        "maskedTokenStr": "The"
+    },
+    "8733591": {
+        "maskedSentenceStr": "The [MASK] Intelligence ( AI ) improves the diagnosis of cancers and the medicine has understood it in the image of the Parisian Hospital of Pitier Salp tri re which quickly adopted iBiopsy . This artificial intelligence platform revolutionizes the treatment of pathologies including liver cancer . Medical imaging methods combined with deep learning and big data analytics help to better extract biomarkers from the progression of the disease . The plateforme Big data IBiopsy increase the proditive value of targeted therapy and strengthen the high precision m dicine . The objective of this AI is to improve the patient s diagnosis and the care of his cancer . I think it s a great advance for the research of cancer . Moreover Artificial intelligence will make it possible to switch to a more preventive m dicine .",
+        "maskedTokenStr": "Artificial"
+    }
+}

@@ -14,6 +14,12 @@ def load_list_of_models(model_paths):
     '''
     # data_collator = DataCollatorForLanguageModeling(tokenizer=tokenizer, mlm_probability=0.15, return_tensors="tf")
     # for path in range(model_paths):
-    model = AutoModelForMaskedLM.from_pretrained("bert-base-uncased")
-    tokenizer = AutoTokenizer.from_pretrained("bert-base-uncased") 
-    return [(model,tokenizer)]
+    models_tpl = []
+    for model_path in model_paths:
+        model = AutoModelForMaskedLM.from_pretrained(model_path)
+        try:
+            tokenizer = AutoTokenizer.from_pretrained(model_path) 
+        except:
+            tokenizer = AutoTokenizer.from_pretrained('bert-base-uncased') 
+        models_tpl.append((model, tokenizer))
+    return models_tpl

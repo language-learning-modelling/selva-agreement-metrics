@@ -20,8 +20,12 @@ def generate_llm_masked_sentence(
     masked_sentence_str = ' '.join(masked_sentence_tokens)
     return masked_sentence_str
 
-def fill_masks_pipeline(sentences_lst):
-    fill_masks_pipeline = pipeline(model='bert-base-uncased')
+def fill_masks_pipeline(sentences_lst, model, tokenizer):
+    fill_masks_pipeline = pipeline(task='fill-mask',
+                                   model=model,
+                                   tokenizer=tokenizer,
+                                   top_k=1000
+                                   )
     return fill_masks_pipeline(sentences_lst)
 
 def clean_text(rowText):
