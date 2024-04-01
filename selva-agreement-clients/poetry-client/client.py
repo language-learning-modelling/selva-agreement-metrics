@@ -28,68 +28,12 @@ def check_agreement(concat_preds):
     '''
     pass
 
-def plot(models_fps, top_k_probs, top_k_str):
-    '''
-    given a list of models that for each you have
-    a list of probabilities plot their probabilities
-    grouped by token 
-
-    plt.simple_multiple_bar(top_k_str,
-                   top_k_probs,
-                   width= 0.1,
-                   )
-    plt.title(f'model top {k}')
-    plt.show() 
-    '''
-    models_names = [
-            m.replace('c4200m','full-efcamdat').split('/')[-1][5:-15] 
-                if len(m) > 50
-                else 
-            m.replace('c4200m','full-efcamdat').split('/')[-1] 
-                for m in models_fps
-            ]
-    model_names = [
-            'learner-model-full-efcamdat',
-            'native-model-bert'
-            ]
-    tokens = top_k_str 
-    probs_per_model = {
-        model_name : probs_lst
-            for model_name, probs_lst
-                in zip(models_names,
-                        top_k_probs) 
-    }
-
-    x = np.arange(len(tokens))  # the label locations
-    width = 0.25  # the width of the bars
-    multiplier = 0
-
-    fig, ax = plt.subplots(layout='constrained')
-
-    for attribute, measurement in probs_per_model.items():
-        offset = width * multiplier
-        rects = ax.bar(x + offset, measurement, width, label=attribute)
-        ax.bar_label(rects, padding=3)
-        multiplier += 1
-
-    # Add some text for labels, title and custom x-axis tick labels, etc.
-    ax.set_ylabel('Length (mm)')
-    ax.set_title('Model probabilities by tokens')
-    ax.set_xticks(x + width, tokens)
-    ax.legend(loc='upper left', ncols=3)
-    ax.set_ylim(0, 250)
-
-    plt.show()
-    input()
-
 def predictions_matrix(models_predictions, k):
     '''
         Pick the top k predictions of each model
         and create an array of probabilities for each
         model with size 3k (concatenating each 3 models top k)
     '''
-
-                            
     prediction_queries = [[prediction['token_str'] for prediction in model_predictions[:k] ]for model_predictions in models_predictions 
                             ]
     
@@ -146,7 +90,8 @@ def main():
         ]
     models_tpl = models.load_list_of_models(models_fps)
     maxNumOfMasks = 3
-    for tokenizedText in tokenizedTexts:
+    for text_idx, tokenizedText in enumerate(tokenizedTexts):
+        row_metadata = row_tpls[text_idx]
         for token_idx, token in enumerate(tokenizedText):
             masked_sentence_tokens = tokenizedText.copy()
             models_predictions = []
@@ -163,8 +108,23 @@ def main():
                         [llm_masked_sentence],
                         model=model,
                         tokenizer=tokenizer) 
-                models_predictions.append(llm_masked_sentence_predictions)
+                models_predictions.append({
+                    'model_name': models_fps[model_idx],
+                    'predictions': llm_masked_sentence_predictions
+                    })
+                print(dir(tokenizer))
+                print(llm_masked_sentence_predictions)
+                print(row_metadata)
+                input()
             k=3
+            data = {
+                    'maskedSentenceStr': ''.join(llm_masked_sentence),
+                    'maskedTokenStr': token,
+                    'models': models_predictions
+            }
+            write_obj(data, outfp='./dataset.json')
+           
+            '''
             concat_preds = predictions_matrix(models_predictions, k)
 
             # only print masked sentences that has a significant disagreement
@@ -181,20 +141,9 @@ def main():
                 top_k_probs.append(it)
             top_k_str = [rag['token_str'] for rag in concat_preds[0]]
             top_k_labels = [i+1 for i in range(k)]
-            plot(models_fps, top_k_probs, top_k_str)
+            #plot(models_fps, top_k_probs, top_k_str)
             input()
-            data = {
-                    'maskedSentenceStr': ''.join(llm_masked_sentence),
-                    'maskedTokenStr': token,
-                    'models': [
-                        {'model_name':,
-                         'tokenizer_name':
-                         f'top_{k}_predictions':,
-                        ]
-            }
-            #write_obj(data, outfp='./dataset.json')
-            print(concat_preds)
-            input()
+            '''
         
 
 if __name__ == '__main__':
