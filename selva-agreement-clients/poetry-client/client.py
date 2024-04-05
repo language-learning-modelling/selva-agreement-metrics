@@ -5,6 +5,7 @@ import random
 import json
 import matplotlib.pyplot as plt
 import numpy as np
+import nltk
 
 
 
@@ -83,9 +84,9 @@ def main():
     models_fps = [
         # '../models/batch-414-bert-base-uncased-fine-tuned-20240305T132046Z-001/'\
         #               'batch-414-bert-base-uncased-fine-tuned',
-        '../models/bert-base-uncased-c4200m-unchaged-vocab-73640000-20240305T133611Z-001/bert-base-uncased-c4200m-unchaged-vocab-73640000',
+        '../models/bert-base-uncased-c4200m-unchaged-vocab-73640000/',
         'distilbert-base-uncased',
-        #'bert-base-uncased',
+        'bert-base-uncased',
         #'xlm-roberta-large'
         ]
     models_tpl = models.load_list_of_models(models_fps)
@@ -108,6 +109,8 @@ def main():
                         [llm_masked_sentence],
                         model=model,
                         tokenizer=tokenizer) 
+                for idx, d in enumerate(llm_masked_sentence_predictions):
+                    llm_masked_sentence_predictions[idx] = d 
                 models_predictions.append({
                     'model_name': models_fps[model_idx],
                     'predictions': llm_masked_sentence_predictions
