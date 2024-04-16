@@ -50,7 +50,8 @@ def read_dataset_pandas(
     ds_eng = ds_eng 
     texts = ds_eng['Texte_etudiant'].to_list()
     vocrange = ds_eng['Voc_range'].to_list()
-    return list(zip(vocrange, texts))
+    records = dataset.reset_index().to_dict(orient='records')
+    return records
 
 def read_dataset(filepath):
     with open(filepath) as inpf:
