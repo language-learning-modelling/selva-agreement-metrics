@@ -16,10 +16,20 @@ def load_list_of_models(model_paths):
     # for path in range(model_paths):
     models_tpl = []
     for model_path in model_paths:
-        model = AutoModelForMaskedLM.from_pretrained(model_path)
+        model = AutoModelForMaskedLM.from_pretrained(
+                                            model_path,
+                                            # max_position_embeddings=4096,
+                                            # ignore_mismatched_sizes=True
+        )
         try:
-            tokenizer = AutoTokenizer.from_pretrained(model_path) 
+            tokenizer = AutoTokenizer.from_pretrained(model_path,
+                                                      max_length=512,
+                                                      truncation=True
+                                                      ) 
         except:
-            tokenizer = AutoTokenizer.from_pretrained('bert-base-uncased') 
+            tokenizer = AutoTokenizer.from_pretrained('bert-base-uncased',
+                                                      max_length=512,
+                                                      truncation=True
+                                                      ) 
         models_tpl.append((model, tokenizer))
     return models_tpl

@@ -1,1 +1,10 @@
 site_name: My Docs
+
+nav:
+  - index.md
+  - logs.md
+
+theme:
+  name: material
+  features:
+    - navigation.tabs

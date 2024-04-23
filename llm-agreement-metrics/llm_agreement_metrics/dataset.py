@@ -20,13 +20,18 @@ def generate_llm_masked_sentence(
     masked_sentence_str = ' '.join(masked_sentence_tokens)
     return masked_sentence_str
 
-def fill_masks_pipeline(sentences_lst, model, tokenizer):
+def fill_masks_pipeline(sentences_lst, model, tokenizer, top_k):
     fill_masks_pipeline = pipeline(task='fill-mask',
                                    model=model,
                                    tokenizer=tokenizer,
-                                   top_k=1000
+                                   top_k=top_k,
+                                   device=0,
                                    )
-    return fill_masks_pipeline(sentences_lst)
+    tokenizer_kwargs = {'padding':True,'truncation':True,'max_length':512,'return_tensors':'pt'}
+    return fill_masks_pipeline(
+                              sentences_lst,
+                              tokenizer_kwargs
+                              )
 
 def clean_text(rowText):
     cleanedText = re.sub('[^a-zA-Z.()]', ' ', rowText)
