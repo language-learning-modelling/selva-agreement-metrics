@@ -153,7 +153,7 @@ if __name__ == "__main__":
     config = {
             "INPUT_FP": "./sample_for_analytics.json", 
             "TOP_K": 3,
-            "MODELS_NAMES": ["bert-base-uncased","bert-c4_200m","bert-efcamdat"]
+            "MODELS_NAMES": ["bert-base-uncased","bert-c4_200m","bert-efcamdat"],
             "fig_width": 18,
             "fig_height": 8 
     }
