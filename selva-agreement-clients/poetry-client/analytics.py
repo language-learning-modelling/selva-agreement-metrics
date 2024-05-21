@@ -31,7 +31,7 @@ def predictions_matrix(models_predictions, k, target_column="token_str"):
         concat_preds.append(concat_predictions)
     return concat_preds 
 
-def plot(top_k, models_names, top_k_probs, top_k_str, target_column, ax, legend):
+def plot(top_k, models_names, top_k_probs, top_k_str, target_column, ax):
     '''
     given a list of models that for each you have
     a list of probabilities plot their probabilities
@@ -67,10 +67,6 @@ def plot(top_k, models_names, top_k_probs, top_k_str, target_column, ax, legend)
     ax.set_title(f'Model top {top_k} probabilities of predicting a {target_column}')
     ax.set_xticks(x + width, tokens)
     ax.set_ylim(0, 100)
-    if legend:
-        ax.legend(loc='upper left', ncols=3)
-    else:
-        ax.legend(loc='upper right', ncols=3)
     # plt.savefig(f"")
     #plt.show()
 
@@ -106,9 +102,9 @@ def agreement_plot(concat_pos, models_names, top_k, target_column, fig, idx):
     top_k_str = [rag[target_column] for rag in concat_pos[0]]
     top_k_labels = [i+1 for i in range(top_k)]
     if idx == 1:
-        ax = plot(top_k, models_names, top_k_probs, top_k_str, target_column, ax, legend=True)
+        ax = plot(top_k, models_names, top_k_probs, top_k_str, target_column, ax)
     else:
-        ax = plot(top_k, models_names, top_k_probs, top_k_str, target_column, ax, legend=False)
+        ax = plot(top_k, models_names, top_k_probs, top_k_str, target_column, ax)
     return fig
 
 def plot_all(
@@ -116,7 +112,7 @@ def plot_all(
         top_k,
         targets
         ):
-    fig = plt.figure()
+    fig = plt.figure(figsize=(18,12))
     fig.subplots_adjust(hspace=0.2, wspace=1)
     for (idx, tpl) in enumerate(targets):
         fig = agreement_plot(
@@ -127,6 +123,7 @@ def plot_all(
                     fig=fig,
                     idx=idx+1)
     plt.tight_layout()
+    plt.legend(loc='upper left', ncols=2)
     plt.show()    
 
 
