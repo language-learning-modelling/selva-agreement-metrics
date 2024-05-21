@@ -108,11 +108,14 @@ def agreement_plot(concat_pos, models_names, top_k, target_column, fig, idx):
     return fig
 
 def plot_all(
+        fig_width,
+        fig_height,
         models_names,
         top_k,
         targets
         ):
-    fig = plt.figure(figsize=(18,12))
+
+    fig = plt.figure(figsize=(fig_width, fig_height))
     fig.subplots_adjust(hspace=0.2, wspace=1)
     for (idx, tpl) in enumerate(targets):
         fig = agreement_plot(
@@ -151,6 +154,8 @@ if __name__ == "__main__":
             "INPUT_FP": "./sample_for_analytics.json", 
             "TOP_K": 3,
             "MODELS_NAMES": ["bert-base-uncased","bert-c4_200m","bert-efcamdat"]
+            "fig_width": 18,
+            "fig_height": 8 
     }
     with open(config["INPUT_FP"]) as inpf:
         masked_sentences = json.load(inpf)
@@ -183,6 +188,8 @@ if __name__ == "__main__":
         print("*"*30)
         
         plot_all(
+                fig_width=config["FIG_WIDTH"],
+                fig_height=config["FIG_HEIGHT"],
                 models_names=config["MODELS_NAMES"],
                 top_k=config["TOP_K"],
                 targets=[
