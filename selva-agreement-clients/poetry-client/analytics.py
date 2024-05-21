@@ -27,15 +27,15 @@ def predictions_matrix(models_predictions, k, target_column="token_str"):
         concat_predictions = concat_predictions +\
                 [{target_column:q, 'score':0} for q in missing_queries] 
         concat_predictions = sorted(concat_predictions, key= lambda d:d[target_column])
-        print([d[target_column] for d in concat_predictions])
+        #print([d[target_column] for d in concat_predictions])
         concat_preds.append(concat_predictions)
     return concat_preds 
 
-def plot(models_names, top_k_probs, top_k_str):
+def plot(top_k, models_names, top_k_probs, top_k_str, target_column, ax, legend):
     '''
     given a list of models that for each you have
     a list of probabilities plot their probabilities
-    grouped by token 
+    grouped by token or other column 
 
     plt.simple_multiple_bar(top_k_str,
                    top_k_probs,
@@ -56,8 +56,6 @@ def plot(models_names, top_k_probs, top_k_str):
     width = 0.25  # the width of the bars
     multiplier = 0
 
-    fig, ax = plt.subplots(layout='constrained')
-
     for attribute, measurement in probs_per_model.items():
         offset = width * multiplier
         rects = ax.bar(x + offset, measurement, width, label=attribute)
@@ -65,14 +63,16 @@ def plot(models_names, top_k_probs, top_k_str):
         multiplier += 1
 
     # Add some text for labels, title and custom x-axis tick labels, etc.
-    ax.set_ylabel('Length (mm)')
-    ax.set_title('Model probabilities by tokens')
+    ax.set_ylabel('Probabilities in %')
+    ax.set_title(f'Model top {top_k} probabilities of predicting a {target_column}')
     ax.set_xticks(x + width, tokens)
-    ax.legend(loc='upper left', ncols=3)
-    ax.set_ylim(0, 250)
-
+    ax.set_ylim(0, 100)
+    if legend:
+        ax.legend(loc='upper left', ncols=3)
+    else:
+        ax.legend(loc='upper right', ncols=3)
     # plt.savefig(f"")
-    plt.show()
+    #plt.show()
 
 
 def aggregate_dicts(lst_of_lst_of_dicts, target_column):
@@ -94,7 +94,8 @@ def aggregate_dicts(lst_of_lst_of_dicts, target_column):
         models_aggregates.append(model_aggregate.values())
     return models_aggregates
 
-def agreement_plot(concat_pos, models_names, top_k, target_column):
+def agreement_plot(concat_pos, models_names, top_k, target_column, fig, idx):
+    ax = fig.add_subplot(1, 2, idx)  # row 1, column 2, count 1
     top_k_probs = []
     for preds_lst in concat_pos:
         it = []
@@ -104,7 +105,29 @@ def agreement_plot(concat_pos, models_names, top_k, target_column):
         top_k_probs.append(it)
     top_k_str = [rag[target_column] for rag in concat_pos[0]]
     top_k_labels = [i+1 for i in range(top_k)]
-    plot(models_names, top_k_probs, top_k_str)
+    if idx == 1:
+        ax = plot(top_k, models_names, top_k_probs, top_k_str, target_column, ax, legend=True)
+    else:
+        ax = plot(top_k, models_names, top_k_probs, top_k_str, target_column, ax, legend=False)
+    return fig
+
+def plot_all(
+        models_names,
+        top_k,
+        targets
+        ):
+    fig = plt.figure()
+    fig.subplots_adjust(hspace=0.4, wspace=0.4)
+    for (idx, tpl) in enumerate(targets):
+        fig = agreement_plot(
+                    tpl[1],
+                    models_names=models_names,
+                    top_k=top_k,
+                    target_column=tpl[0],
+                    fig=fig,
+                    idx=idx+1)
+    plt.tight_layout()
+    plt.show()    
 
 
 def calculate_intersection_matrix(models_predictions):
@@ -149,27 +172,27 @@ if __name__ == "__main__":
                 predictions_matrix([model_d["predictions"] for model_d in d["predictions"]["models"]], config["TOP_K"], target_column="ud_pos"),
                 target_column="ud_pos"
                 )
-        os.system('clear')
-        print(d['predictions']['maskedSentenceStr'])
-        agreement_plot(
-                concat_preds,
-                models_names=config["MODELS_NAMES"],
-                top_k=config["TOP_K"],
-                target_column="token_str"
-        )
-        os.system('clear')
-        print(d['predictions']['maskedSentenceStr'])
-        agreement_plot(
-                concat_pos,
-                models_names=config["MODELS_NAMES"],
-                top_k=config["TOP_K"],
-                target_column="ud_pos"
-        )
-        input()
 
         stats["intersection_matrix"] =  np.array(calculate_intersection_matrix(models_predictions))
         global_stats["intersection_matrix"] = global_stats["intersection_matrix"] + stats["intersection_matrix"]  
+        print("masked sentence string")
+        print("*"*30)
+        print(d['predictions']['maskedSentenceStr'])
+        print("*"*30)
+
+        print("intersection matrix")
+        print("*"*30)
         print(stats["intersection_matrix"])
-        print(global_stats["intersection_matrix"])
+        print("*"*30)
+        
+        plot_all(
+                models_names=config["MODELS_NAMES"],
+                top_k=config["TOP_K"],
+                targets=[
+                    ("token_str", concat_preds),
+                    ("ud_pos", concat_pos),
+                    ]
+                )
+
         input()
     print(global_stats["intersection_matrix"])
