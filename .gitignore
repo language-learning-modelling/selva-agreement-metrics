@@ -4,3 +4,6 @@ A4LL_system/
 selva-agreement-clients/poetry-client/pyenv/
 selva-agreement-clients/poetry-client/udpipe_models/
 selva-agreement-clients/udpipe_models/
+selva_dataset/
+selva-agreement-clients/selva_dataset/
+selva-agreement-clients/poetry-client/selva_dataset/
