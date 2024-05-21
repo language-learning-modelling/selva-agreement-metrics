@@ -151,12 +151,14 @@ def calculate_intersection_matrix(models_predictions):
     return intersection_matrix
             
     
+
 if __name__ == "__main__":
     config = {
+            "INPUT_FP": "./sample_for_analytics.json", 
             "TOP_K": 3,
             "MODELS_FPS": ["bert-base-uncased","bert-c4_200m","bert-efcamdat"]
     }
-    with open("./sample_for_analytics.json") as inpf:
+    with open(config["INPUT_FP"]) as inpf:
         masked_sentences = json.load(inpf)
 
     global_stats = {
