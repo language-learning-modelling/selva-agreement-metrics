@@ -117,7 +117,7 @@ def plot_all(
         targets
         ):
     fig = plt.figure()
-    fig.subplots_adjust(hspace=0.4, wspace=0.4)
+    fig.subplots_adjust(hspace=0.2, wspace=1)
     for (idx, tpl) in enumerate(targets):
         fig = agreement_plot(
                     tpl[1],
