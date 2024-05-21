@@ -3,11 +3,11 @@ from llm_agreement_metrics import dataset, metrics, models
 import os
 import random
 import json
-import matplotlib.pyplot as plt
 import numpy as np
 import nltk
 import time
 from datetime import datetime
+import spacy_udpipe
 
 
 
@@ -36,31 +36,6 @@ def check_agreement(concat_preds):
     '''
     pass
 
-def predictions_matrix(models_predictions, k):
-    '''
-        Pick the top k predictions of each model
-        and create an array of probabilities for each
-        model with size 3k (concatenating each 3 models top k)
-    '''
-    prediction_queries = [[prediction['token_str'] for prediction in model_predictions[:k] ]for model_predictions in models_predictions 
-                            ]
-    
-    prediction_queries = [e for lst in prediction_queries
-                            for e in lst]
-    concat_preds = []
-    for model_predictions in models_predictions:
-        concat_predictions = []
-        for p_dict in model_predictions:
-            if p_dict['token_str'] \
-                    in prediction_queries:
-                concat_predictions.append(p_dict)
-        missing_queries = set(prediction_queries) - set([p['token_str'] for p in concat_predictions])
-        concat_predictions = concat_predictions +\
-                [{'token_str':q, 'score':0} for q in missing_queries] 
-        concat_predictions = sorted(concat_predictions, key= lambda d:d['token_str'])
-        print([d['token_str'] for d in concat_predictions])
-        concat_preds.append(concat_predictions)
-    return concat_preds 
 
 def llm_masked_sentences_per_model(
         model, tokenizer,
@@ -75,25 +50,43 @@ def llm_masked_sentences_per_model(
                     token_idx=token_idx,
                     nMasks=nMasks,
                     maskTokenStr=maskTokenStr
-                ) for nMasks in range(1,4) 
+                ) for nMasks in range(1, nMasks+1) 
             ]
     return llm_masked_sentences
 
+def cls_to_dict(obj):
+    key_value_tpls = [(a,getattr(obj, a)) for a in dir(obj) if not a.startswith('__')]
+    return dict(key_value_tpls)
+
+def pos_annotate_prediction(prediction_dict, masked_sentence_tokens, token_idx):
+    masked_sentence_tokens[token_idx] = prediction_dict["token_str"]
+    simulated_text = " ".join(masked_sentence_tokens) 
+    prediction_dict["ud_pos"] = dataset.tokenize_text(simulated_text, config['ud_model'])[token_idx].pos_
+    return prediction_dict
+
 def main(config):
-    row_dicts = dataset.read_dataset_pandas(config['input_fp'])
+    row_dicts = dataset.read_dataset_pandas(config['input_fp'])[:10]
 
     cleanedTexts = [ dataset.clean_text(d['Texte_etudiant'])
                         for d in row_dicts ]
         
-    tokenizedTexts = [ dataset.tokenize_text(cleanedText)
+    tokenizedTexts = [ dataset.tokenize_text(cleanedText, config['ud_model'])
                         for cleanedText in cleanedTexts ] 
+
+    tokenizedTexts = [ [ {'token_str':t.text,'ud_pos':t.pos_ } for t in tokenLst]
+                        for tokenLst in tokenizedTexts] 
+
+    #keys = [a for a in dir(tokenizedTexts[0][0]) if not a.startswith('_')]
+    # [(k,getattr(tokenizedTexts[0][0],k)) for k in keys])
+    #print(tokenizedTexts[0][0])
 
     models_fps = [
         # '../models/batch-414-bert-base-uncased-fine-tuned-20240305T132046Z-001/'\
         #               'batch-414-bert-base-uncased-fine-tuned',
-        '../models/bert-base-uncased-c4200m-unchaged-vocab-73640000/',
-        'distilbert-base-uncased',
         'bert-base-uncased',
+        '../models/bert-base-uncased-c4200m-unchaged-vocab-73640000/',
+        '../models/bert-base-uncased-fullefcamdat/',
+        #'distilbert-base-uncased',
         #'xlm-roberta-large'
         ]
     models_tpl = models.load_list_of_models(models_fps)
@@ -101,22 +94,21 @@ def main(config):
     write_batch = []
     prediction_batch = []
     start=datetime.utcnow()
-    start_str = f'{start.hour}:{start.minute}:{start.second}'
-    print()
+    start_str = f'{start.year}-{start.month}-{start.day}_{start.hour}:{start.minute}:{start.second}'
     with open(f"./outputs/error_log_{start_str}","w") as errorf:
         pass
     for text_idx, tokenizedText in enumerate(tokenizedTexts):
         row_metadata = row_dicts[text_idx]
         for token_idx, token in enumerate(tokenizedText):
-            masked_sentence_tokens = tokenizedText.copy()
             models_predictions = []
             for model_idx, (model, tokenizer) in enumerate(models_tpl):
+                masked_sentence_tokens = [t['token_str'] for t in tokenizedText.copy()]
                 llm_masked_sentences = \
                     llm_masked_sentences_per_model(
                             model, tokenizer,
                             masked_sentence_tokens,
                             token_idx,
-                            nMasks=maxNumOfMasks,
+                            nMasks=1,#maxNumOfMasks,
                             )
                 llm_masked_sentence = llm_masked_sentences[0]
                 start=time.time()
@@ -134,19 +126,22 @@ def main(config):
                 models_predictions.append({
                     'model_name': models_fps[model_idx],
                     'predictions': [
-                        {
+                        pos_annotate_prediction({
                                 k: v
                         for k, v in d.items()
-                        if k != 'sequence'
-                        } for d in llm_masked_sentence_predictions[:config['top_k']]
+                        if k not in ['sequence']
+                        }, 
+                        masked_sentence_tokens,
+                        token_idx) for d in llm_masked_sentence_predictions[:config['top_k']]
                     ]
                     })
             data = {
                     'metadata': row_metadata,
                     'predictions': {
+                        'maskedToken': token,
                         'maskedSentenceStr': ''.join(llm_masked_sentence),
                         'maskedTokenIdx': token_idx, 
-                        'maskedTokenStr': token,
+                        'maskedTokenStr': token['token_str'],
                         'models': models_predictions
                     },
                     'linguistic_annotations': {
@@ -166,7 +161,7 @@ def main(config):
                     }
             }
             write_batch.append(data)
-            if len(write_batch) >= 500:
+            if len(write_batch) >= 100:
                 write_obj(write_batch, outfp=f'./{config["dataset_name"]}_{start_str}.json', batch=True)
                 end=datetime.utcnow()
                 print(f'{end.hour}:{end.minute}:{end.second}')
@@ -187,8 +182,14 @@ if __name__ == '__main__':
             'L2', 'Note_dialang_ecrit', 'Lecture_regularite',
             'autre_langue', 'tache_ecrit', 'Texte_etudiant', 'Section_renforcee'
         ],
-        'top_k': 3
+        'top_k': 3, 
+        'ud_model_fp': './udpipe_models/english-ewt-ud-2.5-191206.udpipe'
     }
+
+    ud_model = spacy_udpipe.load_from_path(lang="en",
+                                      path=config["ud_model_fp"],
+                                      meta={"description": "A4LL suggested model"})
+    config['ud_model'] = ud_model
     main(config)
     '''
     concat_preds = predictions_matrix(models_predictions, k)

@@ -2,6 +2,7 @@ import re
 import csv
 import pandas as pd
 import nltk
+import spacy_udpipe
 from transformers import pipeline
 
 def generate_llm_masked_sentence(
@@ -28,23 +29,39 @@ def fill_masks_pipeline(sentences_lst, model, tokenizer, top_k):
                                    device=0,
                                    )
     tokenizer_kwargs = {'padding':True,'truncation':True,'max_length':512,'return_tensors':'pt'}
-    return fill_masks_pipeline(
+    #tokenizedTexts = [ [ {'token_str':t.text,'ud_pos':t.pos_ } for t in tokenLst]
+    #                       for tokenLst in tokenizedTexts] 
+    preds = fill_masks_pipeline(
                               sentences_lst,
                               tokenizer_kwargs
                               )
+    return preds
 
 def clean_text(rowText):
-    cleanedText = re.sub('[^a-zA-Z.()]', ' ', rowText)
+    '''
+        INPUT:
+            a raw text string
+            rowText : str
+        OUTPUT:
+            returns alphanumeric 
+            []
+    '''
+    cleanedText = re.sub('[^a-zA-Z.()^,!?+*&%$#"_/<>\']', ' ', rowText)
+    cleanedText=rowText
     return cleanedText
 
-def tokenize_text(cleanedText):
+def tokenize_text(cleanedText,
+                  model):
     '''
         INPUT:
             cleanedText : str
+            model: ud_model
         OUTPUT:
             [Tokens]
     '''
-    return nltk.tokenize.word_tokenize(cleanedText)
+    doc = model(cleanedText)
+    tokens = [ token for token in doc ]
+    return tokens 
 
 def read_dataset_pandas(
                         filepath, 

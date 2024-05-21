@@ -1,2 +1,6 @@
 selva-agreement-clients/models/
 selva-agreement-clients/poetry-client/outputs/
+A4LL_system/
+selva-agreement-clients/poetry-client/pyenv/
+selva-agreement-clients/poetry-client/udpipe_models/
+selva-agreement-clients/udpipe_models/

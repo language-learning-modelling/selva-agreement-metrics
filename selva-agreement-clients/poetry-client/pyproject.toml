@@ -6,7 +6,7 @@ authors = ["bernardo"]
 readme = "README.md"
 
 [tool.poetry.dependencies]
-python = "^3"
+python = "^3.11"
 llm-agreement-metrics = {path = "../../llm-agreement-metrics"}
 jupyter = "^1.0.0"
 plotext = "^5.2.8"
