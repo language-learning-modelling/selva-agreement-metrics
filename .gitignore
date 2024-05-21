@@ -7,3 +7,4 @@ selva-agreement-clients/udpipe_models/
 selva_dataset/
 selva-agreement-clients/selva_dataset/
 selva-agreement-clients/poetry-client/selva_dataset/
+selva-agreement-clients/poetry-client/sample_for_analytics.json

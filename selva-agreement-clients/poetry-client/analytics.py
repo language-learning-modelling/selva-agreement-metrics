@@ -31,7 +31,7 @@ def predictions_matrix(models_predictions, k, target_column="token_str"):
         concat_preds.append(concat_predictions)
     return concat_preds 
 
-def plot(models_fps, top_k_probs, top_k_str):
+def plot(models_names, top_k_probs, top_k_str):
     '''
     given a list of models that for each you have
     a list of probabilities plot their probabilities
@@ -44,17 +44,6 @@ def plot(models_fps, top_k_probs, top_k_str):
     plt.title(f'model top {k}')
     plt.show() 
     '''
-    models_names = [
-            m.replace('c4200m','full-efcamdat').split('/')[-1][5:-15] 
-                if len(m) > 50
-                else 
-            m.replace('c4200m','full-efcamdat').split('/')[-1] 
-                for m in models_fps
-            ]
-    model_names = [
-            'learner-model-full-efcamdat',
-            'native-model-bert'
-            ]
     tokens = top_k_str 
     probs_per_model = {
         model_name : probs_lst
@@ -82,7 +71,7 @@ def plot(models_fps, top_k_probs, top_k_str):
     ax.legend(loc='upper left', ncols=3)
     ax.set_ylim(0, 250)
 
-    plt.savefig(f"/home/berstearns/Desktop/image.png")
+    # plt.savefig(f"")
     plt.show()
 
 
@@ -95,32 +84,17 @@ def aggregate_dicts(lst_of_lst_of_dicts, target_column):
     for model_predictions in lst_of_lst_of_dicts:
         model_aggregate = {}
         for prediction_dict in model_predictions:
-            if model_aggregate.get(prediction_dict["ud_pos"]): 
-                model_aggregate[prediction_dict["ud_pos"]]["score"] += prediction_dict["score"]
+            if model_aggregate.get(prediction_dict[target_column]): 
+                model_aggregate[prediction_dict[target_column]]["score"] += prediction_dict["score"]
             else:
-                model_aggregate[prediction_dict["ud_pos"]] = {
-                            "ud_pos": prediction_dict["ud_pos"],
+                model_aggregate[prediction_dict[target_column]] = {
+                            target_column: prediction_dict[target_column],
                             "score" : prediction_dict["score"]
                         }
         models_aggregates.append(model_aggregate.values())
     return models_aggregates
 
-
-
-def plot_predictions(concat_preds):
-    top_k_probs = []
-    for preds_lst in concat_preds:
-        it = []
-        for pred_dict in preds_lst:
-            percentage_float = float(pred_dict['score'])*100
-            it.append(round(percentage_float,2))
-        top_k_probs.append(it)
-    top_k_str = [rag['token_str'] for rag in concat_preds[0]]
-    top_k_labels = [i+1 for i in range(config["TOP_K"])]
-    plot(config["MODELS_FPS"], top_k_probs, top_k_str)
-
-
-def plot_pos(concat_pos):
+def agreement_plot(concat_pos, models_names, top_k, target_column):
     top_k_probs = []
     for preds_lst in concat_pos:
         it = []
@@ -128,9 +102,9 @@ def plot_pos(concat_pos):
             percentage_float = float(pred_dict['score'])*100
             it.append(round(percentage_float,2))
         top_k_probs.append(it)
-    top_k_str = [rag['ud_pos'] for rag in concat_pos[0]]
-    top_k_labels = [i+1 for i in range(config["TOP_K"])]
-    plot(config["MODELS_FPS"], top_k_probs, top_k_str)
+    top_k_str = [rag[target_column] for rag in concat_pos[0]]
+    top_k_labels = [i+1 for i in range(top_k)]
+    plot(models_names, top_k_probs, top_k_str)
 
 
 def calculate_intersection_matrix(models_predictions):
@@ -156,7 +130,7 @@ if __name__ == "__main__":
     config = {
             "INPUT_FP": "./sample_for_analytics.json", 
             "TOP_K": 3,
-            "MODELS_FPS": ["bert-base-uncased","bert-c4_200m","bert-efcamdat"]
+            "MODELS_NAMES": ["bert-base-uncased","bert-c4_200m","bert-efcamdat"]
     }
     with open(config["INPUT_FP"]) as inpf:
         masked_sentences = json.load(inpf)
@@ -171,16 +145,26 @@ if __name__ == "__main__":
         d = masked_sentence_dict
         models_predictions = [model_d["predictions"] for model_d in d["predictions"]["models"]]
         concat_preds = predictions_matrix(models_predictions, config["TOP_K"])
-        concat_pos = aggregate_dicts(predictions_matrix([model_d["predictions"] for model_d in d["predictions"]["models"]], config["TOP_K"], target_column="ud_pos"), target_column="ud_pos")
-        # only print masked sentences that has a significant disagreement
-        # check_agreement(concat_preds)
+        concat_pos = aggregate_dicts(
+                predictions_matrix([model_d["predictions"] for model_d in d["predictions"]["models"]], config["TOP_K"], target_column="ud_pos"),
+                target_column="ud_pos"
+                )
         os.system('clear')
         print(d['predictions']['maskedSentenceStr'])
-        plot_predictions(concat_preds)
-        input()
+        agreement_plot(
+                concat_preds,
+                models_names=config["MODELS_NAMES"],
+                top_k=config["TOP_K"],
+                target_column="token_str"
+        )
         os.system('clear')
         print(d['predictions']['maskedSentenceStr'])
-        plot_pos(concat_pos)
+        agreement_plot(
+                concat_pos,
+                models_names=config["MODELS_NAMES"],
+                top_k=config["TOP_K"],
+                target_column="ud_pos"
+        )
         input()
 
         stats["intersection_matrix"] =  np.array(calculate_intersection_matrix(models_predictions))
