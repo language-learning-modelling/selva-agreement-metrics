@@ -3,6 +3,7 @@ import os
 import matplotlib.pyplot as plt
 import numpy as np
 import itertools
+import random
 from termcolor import colored
 
 
@@ -155,7 +156,7 @@ if __name__ == "__main__":
             "INPUT_FP": "./sample_for_analytics.json", 
             "TOP_K": 3,
             "MODELS_NAMES": ["bert-base-uncased","bert-c4_200m","bert-efcamdat"],
-            "FIG_WIDTH": 18,
+            "FIG_WIDTH": 10,
             "FIG_HEIGHT": 8 
     }
     with open(config["INPUT_FP"]) as inpf:
@@ -165,6 +166,7 @@ if __name__ == "__main__":
             "intersection_matrix": np.zeros((3,3))
             }
     for pseudo_id, masked_sentence_dict in masked_sentences.items():
+
         stats = {
                 "intersection_matrix": None,
         }
@@ -183,22 +185,24 @@ if __name__ == "__main__":
         print("masked sentence string")
         print("*"*30)
 
-        colored_masked_sentence_str = colored(d['predictions']['maskedSentenceStr'],"red")
+        colored_masked_sentence_str = d['predictions']['maskedSentenceStr']
         colors_splits = colored_masked_sentence_str.split("[MASK]")
         p1 = colors_splits[0]
         if len(colors_splits) > 1:
-            p2 = colored_masked_sentence_str.split("[MASK]")[1]
+            p2 = colors_splits[1]
         else:
             p2 = ''
-        print(colored(p1,'red'), colored('[MASK]','green'), colored(p2,'red'))
+        print(colored(p1,'white'), colored('[MASK]','green'), colored(p2,'white'))
  
-        print(d);input()
         print("*"*30)
 
         print("intersection matrix")
         print("*"*30)
         print(stats["intersection_matrix"])
         print("*"*30)
+        agreement_m1_m3 = stats["intersection_matrix"][0][2] 
+        print(f" numbers of token that agree between native and learner model : {agreement_m1_m3} out of {config['TOP_K']}")
+
         
         plot_all(
                 fig_width=config["FIG_WIDTH"],
