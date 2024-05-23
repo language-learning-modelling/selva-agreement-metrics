@@ -3,6 +3,7 @@ import os
 import matplotlib.pyplot as plt
 import numpy as np
 import itertools
+from termcolor import colored
 
 
 def predictions_matrix(models_predictions, k, target_column="token_str"):
@@ -154,8 +155,8 @@ if __name__ == "__main__":
             "INPUT_FP": "./sample_for_analytics.json", 
             "TOP_K": 3,
             "MODELS_NAMES": ["bert-base-uncased","bert-c4_200m","bert-efcamdat"],
-            "fig_width": 18,
-            "fig_height": 8 
+            "FIG_WIDTH": 18,
+            "FIG_HEIGHT": 8 
     }
     with open(config["INPUT_FP"]) as inpf:
         masked_sentences = json.load(inpf)
@@ -168,6 +169,8 @@ if __name__ == "__main__":
                 "intersection_matrix": None,
         }
         d = masked_sentence_dict
+        masked_token_str = d['predictions']['maskedToken']['token_str']
+        masked_token_ud_pos = d['predictions']['maskedToken']['ud_pos']
         models_predictions = [model_d["predictions"] for model_d in d["predictions"]["models"]]
         concat_preds = predictions_matrix(models_predictions, config["TOP_K"])
         concat_pos = aggregate_dicts(
@@ -179,7 +182,17 @@ if __name__ == "__main__":
         global_stats["intersection_matrix"] = global_stats["intersection_matrix"] + stats["intersection_matrix"]  
         print("masked sentence string")
         print("*"*30)
-        print(d['predictions']['maskedSentenceStr'])
+
+        colored_masked_sentence_str = colored(d['predictions']['maskedSentenceStr'],"red")
+        colors_splits = colored_masked_sentence_str.split("[MASK]")
+        p1 = colors_splits[0]
+        if len(colors_splits) > 1:
+            p2 = colored_masked_sentence_str.split("[MASK]")[1]
+        else:
+            p2 = ''
+        print(colored(p1,'red'), colored('[MASK]','green'), colored(p2,'red'))
+ 
+        print(d);input()
         print("*"*30)
 
         print("intersection matrix")
@@ -197,6 +210,4 @@ if __name__ == "__main__":
                     ("ud_pos", concat_pos),
                     ]
                 )
-
-        input()
     print(global_stats["intersection_matrix"])
