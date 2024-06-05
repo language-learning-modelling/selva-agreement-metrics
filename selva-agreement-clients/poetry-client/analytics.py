@@ -4,6 +4,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 import itertools
 import random
+import collections
 from termcolor import colored
 
 
@@ -13,9 +14,9 @@ def predictions_matrix(models_predictions, k, target_column="token_str"):
         and create an array of probabilities for each
         model with size of the intersection of unique predcitions [max 3k] (concatenating each 3 models top k)
     '''
-    prediction_queries = [[prediction[target_column] for prediction in model_predictions[:k] ]for model_predictions in models_predictions 
+    prediction_queries = [[prediction[target_column] for prediction in model_predictions[:k] ]for model_predictions in models_predictions
                             ]
-    
+
     prediction_queries = [e for lst in prediction_queries
                             for e in lst]
     concat_preds = []
@@ -27,31 +28,31 @@ def predictions_matrix(models_predictions, k, target_column="token_str"):
                 concat_predictions.append(p_dict)
         missing_queries = set(prediction_queries) - set([p[target_column] for p in concat_predictions])
         concat_predictions = concat_predictions +\
-                [{target_column:q, 'score':0} for q in missing_queries] 
+                [{target_column:q, 'score':0} for q in missing_queries]
         concat_predictions = sorted(concat_predictions, key= lambda d:d[target_column])
         #print([d[target_column] for d in concat_predictions])
         concat_preds.append(concat_predictions)
-    return concat_preds 
+    return concat_preds
 
 def plot(top_k, models_names, top_k_probs, top_k_str, target_column, ax):
     '''
     given a list of models that for each you have
     a list of probabilities plot their probabilities
-    grouped by token or other column 
+    grouped by token or other column
 
     plt.simple_multiple_bar(top_k_str,
                    top_k_probs,
                    width= 0.1,
                    )
     plt.title(f'model top {k}')
-    plt.show() 
+    plt.show()
     '''
-    tokens = top_k_str 
+    tokens = top_k_str
     probs_per_model = {
         model_name : probs_lst
             for model_name, probs_lst
                 in zip(models_names,
-                        top_k_probs) 
+                        top_k_probs)
     }
 
     x = np.arange(len(tokens))  # the label locations
@@ -82,7 +83,7 @@ def aggregate_dicts(lst_of_lst_of_dicts, target_column):
     for model_predictions in lst_of_lst_of_dicts:
         model_aggregate = {}
         for prediction_dict in model_predictions:
-            if model_aggregate.get(prediction_dict[target_column]): 
+            if model_aggregate.get(prediction_dict[target_column]):
                 model_aggregate[prediction_dict[target_column]]["score"] += prediction_dict["score"]
             else:
                 model_aggregate[prediction_dict[target_column]] = {
@@ -129,35 +130,68 @@ def plot_all(
                     idx=idx+1)
     plt.tight_layout()
     plt.legend(loc='upper left', ncols=2)
-    plt.show()    
+    plt.show()
 
+def calculate_disagreement_score(m1_preds, m2_preds, intersection_tokens):
+    if len(intersection_tokens) == 0:
+        disagreement_score = 1
 
-def calculate_intersection_matrix(models_predictions):
+    for intersection_token in intersection_tokens:
+        pred_dicts_m1 = [d for d in m1_preds if d['token_str'] == intersection_token ]
+        pred_score_m1 = pred_dicts_m1[0]['score']
+        pred_dicts_m2 = [d for d in m2_preds if d['token_str'] == intersection_token ]
+        pred_score_m2 = pred_dicts_m2[0]['score']
+        disagreement_score = abs(pred_score_m1-pred_score_m2)
+
+    return disagreement_score
+
+def calculate_metrics_between_models(models_predictions):
     '''
-     calculate a simmetric matrix n-models x n-models
-     calculating the intersection count between two given models
-    ''' 
-    intersection_matrix = []
+     calculate one simmetric matrix n-models x n-models
+     for each intersection metric to be calculated between two given models
+    '''
+    intersection_count_matrix = []
+    intersection_disagreement_matrix = []
     n_models = len(models_predictions)
     for m1_preds in list(models_predictions):
-        row=[]
+        count_row=[]
+        disagreement_row=[]
         for m2_preds in list(models_predictions):
             top_k_tokens_m1 = set([d['token_str'] for d in m1_preds])
             top_k_tokens_m2 = set([d['token_str'] for d in m2_preds])
-            intersection_count = len(top_k_tokens_m1.intersection(top_k_tokens_m2)) 
-            row.append(intersection_count)
-        intersection_matrix.append(row)
-    return intersection_matrix
-            
-    
+            intersection_tokens = top_k_tokens_m1.intersection(top_k_tokens_m2)
+            intersection_count = len(intersection_tokens)
+            intersection_disagreement_score = calculate_disagreement_score(
+                                                m1_preds, m2_preds,
+                                                intersection_tokens)
+            count_row.append(intersection_count)
+            disagreement_row.append(intersection_disagreement_score)
+        intersection_count_matrix.append(count_row)
+        intersection_disagreement_matrix.append(disagreement_row)
+    return np.array(intersection_count_matrix), np.array(intersection_disagreement_matrix)
+
+def calculate_learner_behavior_metrics(models_predictions, learner_actual_token_str):
+    '''
+     calculate one simmetric matrix n-models x n-models
+     for each intersection metric to be calculated between two given models
+    '''
+    intersection_count_matrix = []
+    intersection_disagreement_matrix = []
+    n_models = len(models_predictions)
+    for m_preds in list(models_predictions):
+        search_for_token = [ d for d in m_preds if d['token_str'] == learner_actual_token_str]
+        actual_token_dict = search_for_token[0] if len(search_for_token) > 0 else None
+    return np.array(intersection_count_matrix), np.array(intersection_disagreement_matrix)
+
+
 
 if __name__ == "__main__":
     config = {
-            "INPUT_FP": "./sample_for_analytics.json", 
+            "INPUT_FP": "./outputs/CELVA/celva-predictions.json",
             "TOP_K": 3,
             "MODELS_NAMES": ["bert-base-uncased","bert-c4_200m","bert-efcamdat"],
             "FIG_WIDTH": 10,
-            "FIG_HEIGHT": 8 
+            "FIG_HEIGHT": 8
     }
     with open(config["INPUT_FP"]) as inpf:
         masked_sentences = json.load(inpf)
@@ -165,11 +199,24 @@ if __name__ == "__main__":
     global_stats = {
             "intersection_matrix": np.zeros((3,3))
             }
-    for pseudo_id, masked_sentence_dict in masked_sentences.items():
+    texts_aggregations = collections.defaultdict(lambda : {
+            "n_of_tokens": 0,
+        })
+    text_stats = {
+            "n_of_tokens": 0,
+            "intersection_matrix": None,
+    }
+    previous_text_pseudo_id = None
+    for masked_sentence_pseudo_id, masked_sentence_dict in masked_sentences.items():
+        text_pseudo_id = masked_sentence_pseudo_id.split("_")[0]
+        if not (previous_text_pseudo_id is None) and\
+                previous_text_pseudo_id != text_pseudo_id:
+            texts_aggregations[previous_text_pseudo_id].update(text_stats)
+            print(texts_aggregations[previous_text_pseudo_id]);input()
+            text_stats = {
+                    "intersection_matrix": None,
+            }
 
-        stats = {
-                "intersection_matrix": None,
-        }
         d = masked_sentence_dict
         masked_token_str = d['predictions']['maskedToken']['token_str']
         masked_token_ud_pos = d['predictions']['maskedToken']['ud_pos']
@@ -180,8 +227,41 @@ if __name__ == "__main__":
                 target_column="ud_pos"
                 )
 
-        stats["intersection_matrix"] =  np.array(calculate_intersection_matrix(models_predictions))
-        global_stats["intersection_matrix"] = global_stats["intersection_matrix"] + stats["intersection_matrix"]  
+        ############################################
+        ##                                        ##
+        ##    leanrner used token metrics         ##
+        ##                                        ##
+        ############################################
+        '''
+        # what is the model more likely to use the learner token ?
+        '''
+        learner_metriics =  calculate_learner_behavior_metrics(
+                models_predictions,
+                masked_token_str
+                )
+        print(learner_metrics);input()
+
+        ############################################
+        ##                                        ##
+        ##    model agreement metrics             ##
+        ##                                        ##
+        ############################################
+        intersection_matrix_count,\
+                intersection_matrix_score =  calculate_metrics_between_models(models_predictions)
+        print(intersection_matrix_score);input()
+
+        ############################################
+        ##                                        ##
+        ##    text level metrics                  ##
+        ##                                        ##
+        ############################################
+        text_stats["n_of_tokens"] += 1
+        text_stats["intersection_matrix_count"], text_stats["intersection_matrix_score"] =\
+                            intersection_matrix_count, intersection_matrix_score
+        # text_stats["intersection_matrix_kl"] =  np.array(calculate_intersection_matrix(models_predictions))
+
+        # global_stats["intersection_matrix"] = global_stats["intersection_matrix"] + text_stats["intersection_matrix"]
+
         print("masked sentence string")
         print("*"*30)
 
@@ -193,17 +273,16 @@ if __name__ == "__main__":
         else:
             p2 = ''
         print(colored(p1,'white'), colored('[MASK]','green'), colored(p2,'white'))
- 
+
         print("*"*30)
 
         print("intersection matrix")
         print("*"*30)
-        print(stats["intersection_matrix"])
+        print(text_stats["intersection_matrix"])
         print("*"*30)
-        agreement_m1_m3 = stats["intersection_matrix"][0][2] 
+        agreement_m1_m3 = text_stats["intersection_matrix"][0][2]
         print(f" numbers of token that agree between native and learner model : {agreement_m1_m3} out of {config['TOP_K']}")
 
-        
         plot_all(
                 fig_width=config["FIG_WIDTH"],
                 fig_height=config["FIG_HEIGHT"],
@@ -214,4 +293,5 @@ if __name__ == "__main__":
                     ("ud_pos", concat_pos),
                     ]
                 )
-    print(global_stats["intersection_matrix"])
+        previous_text_pseudo_id = text_pseudo_id
+    # print(global_stats["intersection_matrix"])
