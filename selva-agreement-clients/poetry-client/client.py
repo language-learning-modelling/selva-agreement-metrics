@@ -27,16 +27,6 @@ def write_obj(data, outfp, batch=True):
         updated_dict_str = json.dumps(currentDict,indent=4)
         outf.write(updated_dict_str)
 
-def check_agreement(concat_preds):
-    '''
-        given two models predictions calculate agreement
-
-        metrics
-            concat_preds: list of list of dicts
-    '''
-    pass
-
-
 def llm_masked_sentences_per_model(
         model, tokenizer,
         masked_sentence_tokens,
@@ -65,7 +55,7 @@ def pos_annotate_prediction(prediction_dict, masked_sentence_tokens, token_idx):
     return prediction_dict
 
 def main(config):
-    row_dicts = dataset.read_dataset_pandas(config['input_fp'])[:10]
+    row_dicts = dataset.read_dataset_pandas(config['input_fp'])
 
     cleanedTexts = [ dataset.clean_text(d['Texte_etudiant'])
                         for d in row_dicts ]
@@ -80,21 +70,13 @@ def main(config):
     # [(k,getattr(tokenizedTexts[0][0],k)) for k in keys])
     #print(tokenizedTexts[0][0])
 
-    models_fps = [
-        # '../models/batch-414-bert-base-uncased-fine-tuned-20240305T132046Z-001/'\
-        #               'batch-414-bert-base-uncased-fine-tuned',
-        'bert-base-uncased',
-        '../models/bert-base-uncased-c4200m-unchaged-vocab-73640000/',
-        '../models/bert-base-uncased-fullefcamdat/',
-        #'distilbert-base-uncased',
-        #'xlm-roberta-large'
-        ]
-    models_tpl = models.load_list_of_models(models_fps)
+    models_tpl = models.load_list_of_models(config['models_fps'])
     maxNumOfMasks = 3
     write_batch = []
     prediction_batch = []
     start=datetime.utcnow()
     start_str = f'{start.year}-{start.month}-{start.day}_{start.hour}:{start.minute}:{start.second}'
+    print(start_str)
     with open(f"./outputs/error_log_{start_str}","w") as errorf:
         pass
     for text_idx, tokenizedText in enumerate(tokenizedTexts):
@@ -124,7 +106,7 @@ def main(config):
                     continue
 
                 models_predictions.append({
-                    'model_name': models_fps[model_idx],
+                    'model_name': config['models_fps'][model_idx],
                     'predictions': [
                         pos_annotate_prediction({
                                 k: v
@@ -161,7 +143,7 @@ def main(config):
                     }
             }
             write_batch.append(data)
-            if len(write_batch) >= 100:
+            if len(write_batch) >= 10:
                 write_obj(write_batch, outfp=f'./{config["dataset_name"]}_{start_str}.json', batch=True)
                 end=datetime.utcnow()
                 print(f'{end.hour}:{end.minute}:{end.second}')
@@ -174,7 +156,7 @@ def main(config):
 if __name__ == '__main__':
     config = {
         'dataset_name': './outputs/selva-learner-predictions',
-        'input_fp' : './selva_dataset/celvasp_full_annotated_with_metadata_2018_2023.csv',
+        'input_fp' : './outputs/CELVA/celvasp_english_annotated_with_metadata_2018_2023_both_splits_feb2024.csv',
         'expected_metadata': [
             'Date_ajout', 'pseudo', 'Voc_range', 'CECRL',
             'nb_annees_L2', 'L1', 'Domaine_de_specialite',
@@ -182,7 +164,16 @@ if __name__ == '__main__':
             'L2', 'Note_dialang_ecrit', 'Lecture_regularite',
             'autre_langue', 'tache_ecrit', 'Texte_etudiant', 'Section_renforcee'
         ],
-        'top_k': 3, 
+        'models_fps' : [
+            # '../models/batch-414-bert-base-uncased-fine-tuned-20240305T132046Z-001/'\
+            #               'batch-414-bert-base-uncased-fine-tuned',
+            'bert-base-uncased',
+            '../models/bert-base-uncased-c4200m-unchaged-vocab-73640000/',
+            '../models/bert-base-uncased-fullefcamdat/',
+            #'distilbert-base-uncased',
+            #'xlm-roberta-large'
+            ],
+        'top_k': 100, 
         'ud_model_fp': './udpipe_models/english-ewt-ud-2.5-191206.udpipe'
     }
 
@@ -191,23 +182,3 @@ if __name__ == '__main__':
                                       meta={"description": "A4LL suggested model"})
     config['ud_model'] = ud_model
     main(config)
-    '''
-    concat_preds = predictions_matrix(models_predictions, k)
-
-    # only print masked sentences that has a significant disagreement
-    # check_agreement(concat_preds)
-    os.system('clear')
-    print(''.join(llm_masked_sentence))
-    print(len(llm_masked_sentence_predictions))
-    top_k_probs = []
-    for preds_lst in concat_preds:
-        it = []
-        for pred_dict in preds_lst:
-            it.append(round(pred_dict['score']*100,2))
-        print(it)
-        top_k_probs.append(it)
-    top_k_str = [rag['token_str'] for rag in concat_preds[0]]
-    top_k_labels = [i+1 for i in range(k)]
-    #plot(models_fps, top_k_probs, top_k_str)
-    input()
-    '''
