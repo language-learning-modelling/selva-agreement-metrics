@@ -7,6 +7,8 @@ import random
 import collections
 import pandas as pd
 from termcolor import colored
+from kl_matrix import kl_matrix
+from visualisations import groups_box_plot
 
 
 def predictions_matrix(models_predictions, k, target_column="token_str"):
@@ -184,40 +186,19 @@ def calculate_learner_behavior_metrics(models_predictions, learner_actual_token_
         scores_per_model.append(actual_token_score)
     return np.array(scores_per_model)
 
-
-def KL(a, b):
-    a = np.asarray(a, dtype=np.float)
-    b = np.asarray(b, dtype=np.float)
-
-    return np.sum(np.where(a != 0, a * np.log(a / b), 0))
-
-    '''
-    def pertubation_KL(P,Q):
-        """ Epsilon is used here to avoid conditional code for
-        checking that neither P nor Q is equal to 0. """
-        epsilon = 0.001
-
-        # You may want to instead make copies to avoid changing the np arrays.
-        P = P+epsilon
-        Q = Q+epsilon
-
-        divergence = np.sum(P*np.log(P/Q))
-        return divergence
-    '''
-
-
-
-
 if __name__ == "__main__":
     config = {
-            "INPUT_FP": "./outputs/CELVA/celva-predictions.json",
+            "INPUT_FP": "./outputs/CELVA/celva-predictions.json",#"./outputs/selva-learner-predictions_2024-6-6_14:24:5.json",#
             "LEXICAL_FP": "./outputs/SUBTLEXusfrequencyabove1.xls",
-            "TOP_K": 3,
+            "TOP_K": 10,
             "MODELS_NAMES": ["bert-base-uncased","bert-c4_200m","bert-efcamdat"],
             "FIG_WIDTH": 10,
             "FIG_HEIGHT": 8
     }
 
+    bug_errors_count = {
+            'missing_predictions': 0
+    }
     lexical_ref = json.loads(
                     pd.read_excel(config["LEXICAL_FP"]).to_json(orient="records")
                   )  
@@ -235,6 +216,62 @@ if __name__ == "__main__":
             "intersection_matrix": None,
     }
     previous_text_pseudo_id = None
+    cefr_kl_boxplot_data= {
+            'A1': [],
+            'A2': [],
+            'B1': [],
+            'B2': [],
+            'C1': [],
+            'C2': [],
+    }
+    voc_range_kl_boxplot_data= {
+            'A1': [],
+            'A2': [],
+            'B1': [],
+            'B2': [],
+            'C1': [],
+            'C2': [],
+    }
+    cefr_kl_ud_pos_boxplot_data=collections.defaultdict(lambda : {
+                'A1': [],
+                'A2': [],
+                'B1': [],
+                'B2': [],
+                'C1': [],
+                'C2': [],
+    })
+    voc_range_kl_ud_pos_boxplot_data=collections.defaultdict(lambda : {
+                'A1': [],
+                'A2': [],
+                'B1': [],
+                'B2': [],
+                'C1': [],
+                'C2': [],
+    })
+    cefr_prob_diff_boxplot_data= {
+            'A1': [],
+            'A2': [],
+            'B1': [],
+            'B2': [],
+            'C1': [],
+            'C2': [],
+    }
+    cefr_prob_diff_ud_pos_boxplot_data=collections.defaultdict(lambda : {
+                'A1': [],
+                'A2': [],
+                'B1': [],
+                'B2': [],
+                'C1': [],
+                'C2': [],
+    })
+    voc_range_prob_diff_boxplot_data= {
+            'A1': [],
+            'A2': [],
+            'B1': [],
+            'B2': [],
+            'C1': [],
+            'C2': [],
+    }
     for masked_sentence_pseudo_id, masked_sentence_dict in masked_sentences.items():
         text_pseudo_id = masked_sentence_pseudo_id.split("_")[0]
         if not (previous_text_pseudo_id is None) and\
@@ -247,11 +284,13 @@ if __name__ == "__main__":
             }
 
         d = masked_sentence_dict
+        text_cefr = d['metadata']['CECRL']
+        text_vocab_range = d['metadata']['Voc_range']
         masked_token_str = d['predictions']['maskedToken']['token_str']
         masked_token_ud_pos = d['predictions']['maskedToken']['ud_pos']
+        models_names = [model_d["model_name"] for model_d in d["predictions"]["models"]]
         models_predictions = [model_d["predictions"] for model_d in d["predictions"]["models"]]
         concat_preds = predictions_matrix(models_predictions, config["TOP_K"])
-        print(concat_preds[0]);input()
         concat_pos = aggregate_dicts(
                 predictions_matrix([model_d["predictions"] for model_d in d["predictions"]["models"]], config["TOP_K"], target_column="ud_pos"),
                 target_column="ud_pos"
@@ -269,7 +308,13 @@ if __name__ == "__main__":
                 models_predictions,
                 masked_token_str
                 )
-        print(learner_metrics)
+        try:
+            native_full_learner_prob_diff = abs(learner_metrics[0]-learner_metrics[2])
+            cefr_prob_diff_boxplot_data[text_cefr].append(native_full_learner_prob_diff)
+            cefr_prob_diff_ud_pos_boxplot_data[masked_token_ud_pos][text_cefr].append(native_full_learner_prob_diff)
+            voc_range_prob_diff_boxplot_data[text_cefr].append(native_full_learner_prob_diff)
+        except:
+            pass
 
         ############################################
         ##                                        ##
@@ -281,14 +326,24 @@ if __name__ == "__main__":
         print(intersection_matrix_count)
         print(intersection_matrix_score)
 
+        kl_metric_matrix = kl_matrix(models_names, models_predictions)
+        try:
+            arbitrary_kl_metric = kl_metric_matrix[0][2] + kl_metric_matrix[2][0]
+            cefr_kl_boxplot_data[text_cefr].append(arbitrary_kl_metric)
+            cefr_kl_ud_pos_boxplot_data[masked_token_ud_pos][text_cefr].append(arbitrary_kl_metric)
+            voc_range_kl_boxplot_data[text_vocab_range].append(arbitrary_kl_metric)
+            voc_range_kl_ud_pos_boxplot_data[masked_token_ud_pos][text_vocab_range].append(arbitrary_kl_metric)
+        except:
+           bug_errors_count['missing_predictions'] += 1
+
         ############################################
         ##                                        ##
         ##    text level metrics                  ##
         ##                                        ##
         ############################################
         text_stats["n_of_tokens"] += 1
-        text_stats["intersection_matrix_count"], text_stats["intersection_matrix_score"] =\
-                            intersection_matrix_count, intersection_matrix_score
+        #text_stats["intersection_matrix_count"], text_stats["intersection_matrix_score"] =\
+        #                    intersection_matrix_count, intersection_matrix_score
         # text_stats["intersection_matrix_kl"] =  np.array(calculate_intersection_matrix(models_predictions))
 
         # global_stats["intersection_matrix"] = global_stats["intersection_matrix"] + text_stats["intersection_matrix"]
@@ -317,6 +372,7 @@ if __name__ == "__main__":
                     ]
                 )
         '''
-        input()
+        #input()
         previous_text_pseudo_id = text_pseudo_id
     # print(global_stats["intersection_matrix"])
+    # print(f'bug errors count, missing predictions: {bug_errors_count["missing_predictions"]}') 

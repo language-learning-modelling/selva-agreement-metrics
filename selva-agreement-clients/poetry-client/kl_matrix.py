@@ -1,6 +1,5 @@
 import numpy as np
 def kl_matrix(models_names, models_predictions):
-    print(models_predictions)
     kl_matrix = []
     preds_str_union = [pred['token_str'] for preds in  models_predictions
                             for pred in preds  ]
@@ -19,16 +18,13 @@ def kl_matrix(models_names, models_predictions):
     for k1 in ordered_vectors.keys():
         row=[]
         for k2 in ordered_vectors.keys():
-            kl_str = str(KL(ordered_vectors[k1],ordered_vectors[k2]))
+            # kl_str = str(KL(ordered_vectors[k1],ordered_vectors[k2]))
             kl_pert = KL_with_pertubation(np.array(ordered_vectors[k1]),
                                          np.array(ordered_vectors[k2])
                                          )
-            print(ordered_vectors[k1],ordered_vectors[k2])
-            print(kl_str)
             row.append(kl_pert)
         kl_matrix.append(row)
-    print(kl_matrix)
-    input()
+    return np.array(kl_matrix)
 
 
 

@@ -9,3 +9,4 @@ selva-agreement-clients/selva_dataset/
 selva-agreement-clients/poetry-client/selva_dataset/
 selva-agreement-clients/poetry-client/sample_for_analytics.json
 selva-agreement-clients/poetry-client/outputs
+selva-agreement-clients/poetry-client/__pycache__/
