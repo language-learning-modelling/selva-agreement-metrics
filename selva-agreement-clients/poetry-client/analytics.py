@@ -5,6 +5,7 @@ import numpy as np
 import itertools
 import random
 import collections
+import pandas as pd
 from termcolor import colored
 
 
@@ -142,7 +143,7 @@ def calculate_disagreement_score(m1_preds, m2_preds, intersection_tokens):
         pred_dicts_m2 = [d for d in m2_preds if d['token_str'] == intersection_token ]
         pred_score_m2 = pred_dicts_m2[0]['score']
         disagreement_score = abs(pred_score_m1-pred_score_m2)
-
+    
     return disagreement_score
 
 def calculate_metrics_between_models(models_predictions):
@@ -175,24 +176,51 @@ def calculate_learner_behavior_metrics(models_predictions, learner_actual_token_
      calculate one simmetric matrix n-models x n-models
      for each intersection metric to be calculated between two given models
     '''
-    intersection_count_matrix = []
-    intersection_disagreement_matrix = []
+    scores_per_model = []
     n_models = len(models_predictions)
     for m_preds in list(models_predictions):
-        search_for_token = [ d for d in m_preds if d['token_str'] == learner_actual_token_str]
-        actual_token_dict = search_for_token[0] if len(search_for_token) > 0 else None
-    return np.array(intersection_count_matrix), np.array(intersection_disagreement_matrix)
+        search_for_token = [ d for d in m_preds if d['token_str'].lower() == learner_actual_token_str.lower()]
+        actual_token_score = search_for_token[0]['score'] if len(search_for_token) > 0 else 0 
+        scores_per_model.append(actual_token_score)
+    return np.array(scores_per_model)
+
+
+def KL(a, b):
+    a = np.asarray(a, dtype=np.float)
+    b = np.asarray(b, dtype=np.float)
+
+    return np.sum(np.where(a != 0, a * np.log(a / b), 0))
+
+    '''
+    def pertubation_KL(P,Q):
+        """ Epsilon is used here to avoid conditional code for
+        checking that neither P nor Q is equal to 0. """
+        epsilon = 0.001
+
+        # You may want to instead make copies to avoid changing the np arrays.
+        P = P+epsilon
+        Q = Q+epsilon
+
+        divergence = np.sum(P*np.log(P/Q))
+        return divergence
+    '''
+
 
 
 
 if __name__ == "__main__":
     config = {
             "INPUT_FP": "./outputs/CELVA/celva-predictions.json",
+            "LEXICAL_FP": "./outputs/SUBTLEXusfrequencyabove1.xls",
             "TOP_K": 3,
             "MODELS_NAMES": ["bert-base-uncased","bert-c4_200m","bert-efcamdat"],
             "FIG_WIDTH": 10,
             "FIG_HEIGHT": 8
     }
+
+    lexical_ref = json.loads(
+                    pd.read_excel(config["LEXICAL_FP"]).to_json(orient="records")
+                  )  
     with open(config["INPUT_FP"]) as inpf:
         masked_sentences = json.load(inpf)
 
@@ -212,8 +240,9 @@ if __name__ == "__main__":
         if not (previous_text_pseudo_id is None) and\
                 previous_text_pseudo_id != text_pseudo_id:
             texts_aggregations[previous_text_pseudo_id].update(text_stats)
-            print(texts_aggregations[previous_text_pseudo_id]);input()
+            # print(texts_aggregations[previous_text_pseudo_id]);input()
             text_stats = {
+                    "n_of_tokens": 0,
                     "intersection_matrix": None,
             }
 
@@ -222,6 +251,7 @@ if __name__ == "__main__":
         masked_token_ud_pos = d['predictions']['maskedToken']['ud_pos']
         models_predictions = [model_d["predictions"] for model_d in d["predictions"]["models"]]
         concat_preds = predictions_matrix(models_predictions, config["TOP_K"])
+        print(concat_preds[0]);input()
         concat_pos = aggregate_dicts(
                 predictions_matrix([model_d["predictions"] for model_d in d["predictions"]["models"]], config["TOP_K"], target_column="ud_pos"),
                 target_column="ud_pos"
@@ -235,11 +265,11 @@ if __name__ == "__main__":
         '''
         # what is the model more likely to use the learner token ?
         '''
-        learner_metriics =  calculate_learner_behavior_metrics(
+        learner_metrics =  calculate_learner_behavior_metrics(
                 models_predictions,
                 masked_token_str
                 )
-        print(learner_metrics);input()
+        print(learner_metrics)
 
         ############################################
         ##                                        ##
@@ -248,7 +278,8 @@ if __name__ == "__main__":
         ############################################
         intersection_matrix_count,\
                 intersection_matrix_score =  calculate_metrics_between_models(models_predictions)
-        print(intersection_matrix_score);input()
+        print(intersection_matrix_count)
+        print(intersection_matrix_score)
 
         ############################################
         ##                                        ##
@@ -274,15 +305,7 @@ if __name__ == "__main__":
             p2 = ''
         print(colored(p1,'white'), colored('[MASK]','green'), colored(p2,'white'))
 
-        print("*"*30)
-
-        print("intersection matrix")
-        print("*"*30)
-        print(text_stats["intersection_matrix"])
-        print("*"*30)
-        agreement_m1_m3 = text_stats["intersection_matrix"][0][2]
-        print(f" numbers of token that agree between native and learner model : {agreement_m1_m3} out of {config['TOP_K']}")
-
+        '''
         plot_all(
                 fig_width=config["FIG_WIDTH"],
                 fig_height=config["FIG_HEIGHT"],
@@ -293,5 +316,7 @@ if __name__ == "__main__":
                     ("ud_pos", concat_pos),
                     ]
                 )
+        '''
+        input()
         previous_text_pseudo_id = text_pseudo_id
     # print(global_stats["intersection_matrix"])
