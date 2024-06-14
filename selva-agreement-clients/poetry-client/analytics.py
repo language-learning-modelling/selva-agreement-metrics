@@ -188,7 +188,7 @@ def calculate_learner_behavior_metrics(models_predictions, learner_actual_token_
 
 if __name__ == "__main__":
     config = {
-            "INPUT_FP": "./outputs/CELVA/celva-predictions.json",#"./outputs/selva-learner-predictions_2024-6-6_14:24:5.json",#
+            "INPUT_FP": "./outputs/selva-learner-predictions_2024-6-6_14:24:5.json",#"./outputs/CELVA/celva-predictions.json",
             "LEXICAL_FP": "./outputs/SUBTLEXusfrequencyabove1.xls",
             "TOP_K": 10,
             "MODELS_NAMES": ["bert-base-uncased","bert-c4_200m","bert-efcamdat"],
@@ -309,7 +309,7 @@ if __name__ == "__main__":
                 masked_token_str
                 )
         try:
-            native_full_learner_prob_diff = abs(learner_metrics[0]-learner_metrics[2])
+            native_full_learner_prob_diff = abs(learner_metrics[0])
             cefr_prob_diff_boxplot_data[text_cefr].append(native_full_learner_prob_diff)
             cefr_prob_diff_ud_pos_boxplot_data[masked_token_ud_pos][text_cefr].append(native_full_learner_prob_diff)
             voc_range_prob_diff_boxplot_data[text_cefr].append(native_full_learner_prob_diff)
