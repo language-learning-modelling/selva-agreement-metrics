@@ -11,20 +11,27 @@ import spacy_udpipe
 
 
 
-def write_obj(data, outfp, batch=True):
+def write_obj(data, outfp, batch=True, partial_dict=None):
     try:
         with open(outfp) as inpf:
-         currentDict = json.loads(inpf.read())
+         current_stored_dict = json.loads(inpf.read())
     except:
-        currentDict = {}
+        current_stored_dict = {}
+    if not (partial_dict is None):
+        missing_items = {
+                k:v for k,v in partial_dict.items()
+                if k not in current_stored_dict
+                }
+        current_stored_dict.update(missing_items)
     with open(outfp,'w') as outf:
         if batch:
             for data_dict in data:
-                data_id = f"{data_dict['metadata']['pseudo']}_{data_dict['predictions']['maskedTokenIdx']}"
-                currentDict.update({data_id: data_dict})
+                data_id = data_dict['predictions']['maskedTokenId']
+                current_stored_dict.update({data_id: data_dict})
         else:
-            currentDict.update({data['metadata']['pseudo']: data})
-        updated_dict_str = json.dumps(currentDict,indent=4)
+            data_id = data['metadata']['pseudo']
+            current_stored_dict.update({data['metadata']['pseudo']: data})
+        updated_dict_str = json.dumps(current_stored_dict,indent=4)
         outf.write(updated_dict_str)
 
 def llm_masked_sentences_per_model(
@@ -55,8 +62,12 @@ def pos_annotate_prediction(prediction_dict, masked_sentence_tokens, token_idx):
     return prediction_dict
 
 def main(config):
+    main_start=datetime.utcnow()
+    print(f'main script: {main_start.year}-{main_start.month}-{main_start.day}_{main_start.hour}:{main_start.minute}:{main_start.second}')
     row_dicts = dataset.read_dataset_pandas(config['input_fp'])
 
+
+    partial_processed_dict = json.load(open(config['partial_fp'])) if os.path.exists(config['partial_fp']) == True else {}
     cleanedTexts = [ dataset.clean_text(d['Texte_etudiant'])
                         for d in row_dicts ]
         
@@ -66,22 +77,29 @@ def main(config):
     tokenizedTexts = [ [ {'token_str':t.text,'ud_pos':t.pos_ } for t in tokenLst]
                         for tokenLst in tokenizedTexts] 
 
-    #keys = [a for a in dir(tokenizedTexts[0][0]) if not a.startswith('_')]
-    # [(k,getattr(tokenizedTexts[0][0],k)) for k in keys])
-    #print(tokenizedTexts[0][0])
-
     models_tpl = models.load_list_of_models(config['models_fps'])
     maxNumOfMasks = 3
     write_batch = []
     prediction_batch = []
     start=datetime.utcnow()
     start_str = f'{start.year}-{start.month}-{start.day}_{start.hour}:{start.minute}:{start.second}'
-    print(start_str)
+    write_obj(write_batch, 
+            outfp=f'./{config["dataset_name"]}_{start_str}.json',
+            batch=True,
+            partial_dict=partial_processed_dict
+          )
+    print('starting processing',start_str)
+
     with open(f"./outputs/error_log_{start_str}","w") as errorf:
         pass
+
     for text_idx, tokenizedText in enumerate(tokenizedTexts):
         row_metadata = row_dicts[text_idx]
         for token_idx, token in enumerate(tokenizedText):
+            maskedTokenId = f"{row_metadata['pseudo']}_{token_idx}"
+            if partial_processed_dict.get(maskedTokenId, False):
+                continue
+
             models_predictions = []
             for model_idx, (model, tokenizer) in enumerate(models_tpl):
                 masked_sentence_tokens = [t['token_str'] for t in tokenizedText.copy()]
@@ -122,6 +140,7 @@ def main(config):
                     'predictions': {
                         'maskedToken': token,
                         'maskedSentenceStr': ''.join(llm_masked_sentence),
+                        'maskedTokenId':  maskedTokenId,
                         'maskedTokenIdx': token_idx, 
                         'maskedTokenStr': token['token_str'],
                         'models': models_predictions
@@ -130,20 +149,19 @@ def main(config):
                        'sentence': {
                         },
                        'tokens': {
-
                         },
-                       'models_predictions':[
+                       'models_predictions':['''
                             {
                             'model_name': d['model_name'],
                             'predictions_annotations': [{
                                 'idx': idx
                             } for idx in range(len(d['predictions']))],
-                            } for d in models_predictions 
+                            } for d in models_predictions''' 
                         ]
                     }
             }
             write_batch.append(data)
-            if len(write_batch) >= 10:
+            if len(write_batch) >= 10000:
                 write_obj(write_batch, outfp=f'./{config["dataset_name"]}_{start_str}.json', batch=True)
                 end=datetime.utcnow()
                 print(f'{end.hour}:{end.minute}:{end.second}')
@@ -157,6 +175,7 @@ if __name__ == '__main__':
     config = {
         'dataset_name': './outputs/selva-learner-predictions',
         'input_fp' : './outputs/CELVA/celvasp_english_annotated_with_metadata_2018_2023_both_splits_feb2024.csv',
+        'partial_fp': './outputs/selva-learner-predictions_2024-6-6_14:24:5.json',
         'expected_metadata': [
             'Date_ajout', 'pseudo', 'Voc_range', 'CECRL',
             'nb_annees_L2', 'L1', 'Domaine_de_specialite',
