@@ -12,17 +12,19 @@ import spacy_udpipe
 
 
 def write_obj(data, outfp, batch=True, partial_dict=None):
-    try:
+    if os.path.exists(outfp):
         with open(outfp) as inpf:
          current_stored_dict = json.loads(inpf.read())
-    except:
+    else:
         current_stored_dict = {}
+
     if not (partial_dict is None):
         missing_items = {
                 k:v for k,v in partial_dict.items()
                 if k not in current_stored_dict
                 }
         current_stored_dict.update(missing_items)
+
     with open(outfp,'w') as outf:
         if batch:
             for data_dict in data:
@@ -65,9 +67,31 @@ def main(config):
     main_start=datetime.utcnow()
     print(f'main script: {main_start.year}-{main_start.month}-{main_start.day}_{main_start.hour}:{main_start.minute}:{main_start.second}')
     row_dicts = dataset.read_dataset_pandas(config['input_fp'])
+    if config.get('partial_fp', False) and os.path.exists(config['partial_fp']):
+        partial_processed_dict = json.load(open(config['partial_fp']))
+    elif config.get('partial_fp', False) and not os.path.exists(config['partial_fp']):
+        raise Exception("Given partial processed file does not exists, remove it from the config to start processing from scratch")
+    else:
+        partial_processed_dict =  {}
 
 
-    partial_processed_dict = json.load(open(config['partial_fp'])) if os.path.exists(config['partial_fp']) == True else {}
+
+    start=datetime.utcnow()
+    start_str = f'{start.year}-{start.month}-{start.day}_{start.hour}:{start.minute}:{start.second}'
+    processed_file_fp = f'{config["dataset_fp"]}_{start_str}.json'
+    write_batch = []
+    prediction_batch = []
+    print(f'saving processed file in {processed_file_fp}') 
+    write_obj(write_batch, 
+            outfp=processed_file_fp,
+            batch=True,
+            partial_dict=partial_processed_dict
+          )
+    print('starting processing',start_str)
+
+    processed_error_log =f"./outputs/error_log_{start_str}"
+
+
     cleanedTexts = [ dataset.clean_text(d['Texte_etudiant'])
                         for d in row_dicts ]
         
@@ -79,26 +103,22 @@ def main(config):
 
     models_tpl = models.load_list_of_models(config['models_fps'])
     maxNumOfMasks = 3
-    write_batch = []
-    prediction_batch = []
-    start=datetime.utcnow()
-    start_str = f'{start.year}-{start.month}-{start.day}_{start.hour}:{start.minute}:{start.second}'
-    write_obj(write_batch, 
-            outfp=f'./{config["dataset_name"]}_{start_str}.json',
-            batch=True,
-            partial_dict=partial_processed_dict
-          )
-    print('starting processing',start_str)
-
-    with open(f"./outputs/error_log_{start_str}","w") as errorf:
+    loop_count = 0
+    loop_start = time.time()
+    with open(processed_error_log,"w") as errorf:
         pass
-
     for text_idx, tokenizedText in enumerate(tokenizedTexts):
         row_metadata = row_dicts[text_idx]
         for token_idx, token in enumerate(tokenizedText):
             maskedTokenId = f"{row_metadata['pseudo']}_{token_idx}"
+            if loop_count % 10 == 0:
+                print(f'processing 100 masked sentences took : {time.time() - loop_start} seconds')
+                loop_start=time.time()
+
             if partial_processed_dict.get(maskedTokenId, False):
                 continue
+            else:
+                loop_count+=1
 
             models_predictions = []
             for model_idx, (model, tokenizer) in enumerate(models_tpl):
@@ -119,7 +139,7 @@ def main(config):
                             tokenizer=tokenizer,
                             top_k=config['top_k']) 
                 except:
-                    with open("./outputs/error_log","a") as errorf:
+                    with open(processed_error_log,"a") as errorf:
                         errorf.write(llm_masked_sentence+'\n')
                     continue
 
@@ -161,21 +181,24 @@ def main(config):
                     }
             }
             write_batch.append(data)
-            if len(write_batch) >= 10000:
-                write_obj(write_batch, outfp=f'./{config["dataset_name"]}_{start_str}.json', batch=True)
+            if len(write_batch) >= 100:
+                write_obj(write_batch, outfp=processed_file_fp, batch=True)
                 end=datetime.utcnow()
+                print(f'*'*100)
+                print(f'writing batch')
                 print(f'{end.hour}:{end.minute}:{end.second}')
+                print(f'*'*100)
                 write_batch=[]
 
     if len(write_batch) > 0:
-        write_obj(write_batch, outfp=f'./{config["dataset_name"]}_{start_str}.json', batch=True)
+        write_obj(write_batch, outfp=processed_file_fp, batch=True)
         write_batch=[]
                
 if __name__ == '__main__':
     config = {
-        'dataset_name': './outputs/selva-learner-predictions',
+        'dataset_fp': './outputs/selva-learner-predictions',
         'input_fp' : './outputs/CELVA/celvasp_english_annotated_with_metadata_2018_2023_both_splits_feb2024.csv',
-        'partial_fp': './outputs/selva-learner-predictions_2024-6-6_14:24:5.json',
+        'partial_fp': './outputs/selva-learner-predictions_2024-6-13_16:18:18.json',
         'expected_metadata': [
             'Date_ajout', 'pseudo', 'Voc_range', 'CECRL',
             'nb_annees_L2', 'L1', 'Domaine_de_specialite',
