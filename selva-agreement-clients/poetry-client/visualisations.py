@@ -2,19 +2,25 @@ import seaborn as sns
 import numpy as np
 import matplotlib.pyplot as plt 
 import operator as op
+from statistics import median
 
+def calc(data):
+    if len(data) > 1:
+        median(data)
 def groups_box_plot(plot_data):
+    median_per_group = { cefr: calc(data) for cefr,data in plot_data.items()}
     print(plot_data)
     sorted_keys, sorted_vals = zip(*sorted(plot_data.items(), key=op.itemgetter(0)))
     print(sorted_keys)
 
 
     sns.set(context="notebook", style='whitegrid')
-    sns.utils.axlabel(xlabel="Groups", ylabel="KL-metric per Masked Sentence")
+    sns.utils.axlabel(xlabel="Groups", ylabel="KL-metric per Masked Token in a  Sentence")
     sns.boxplot(
             data=sorted_vals, width=0.10
             )
     # sns.swarmplot(data=sorted_vals, size=6, edgecolor="black", linewidth=0.9)
+    print(f"medians per group", median_per_group)
     plt.xticks(plt.xticks()[0], sorted_keys)
     plt.show()
 
