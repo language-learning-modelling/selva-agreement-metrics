@@ -8,8 +8,7 @@ import collections
 import pandas as pd
 from termcolor import colored
 from kl_matrix import kl_matrix
-from visualisations import groups_box_plot
-
+from visualisations import groups_box_plot, sorted_histogram
 
 def predictions_matrix(models_predictions, k, target_column="token_str"):
     '''
@@ -124,11 +123,12 @@ def plot_all(
     fig = plt.figure(figsize=(fig_width, fig_height))
     fig.subplots_adjust(hspace=0.2, wspace=1)
     for (idx, tpl) in enumerate(targets):
+        column_name, concat_preds = tpl
         fig = agreement_plot(
-                    tpl[1],
+                    concat_preds,
                     models_names=models_names,
                     top_k=top_k,
-                    target_column=tpl[0],
+                    target_column=column_name,
                     fig=fig,
                     idx=idx+1)
     plt.tight_layout()
@@ -188,9 +188,13 @@ def calculate_learner_behavior_metrics(models_predictions, learner_actual_token_
 
 if __name__ == "__main__":
     config = {
-            "INPUT_FP": "./outputs/selva-learner-predictions_2024-6-6_14:24:5.json",#"./outputs/CELVA/celva-predictions.json",
-            "LEXICAL_FP": "./outputs/SUBTLEXusfrequencyabove1.xls",
+            "INPUT_FP": "outputs/selva-learner-predictions_2024-6-14_20:57:31.json",
+            #"outputs/selva-learner-predictions_2024-6-14_20:57:31.json",
+            #"./outputs/selva-learner-predictions_2024-6-6_14:24:5.json",
+            #"./outputs/CELVA/celva-predictions.json",
+            "LEXICAL_FP": "./outputs/SUBTLEX-US-POS-ZIPF.xlsx",#"./outputs/SUBTLEXusfrequencyabove1.xls",
             "TOP_K": 10,
+            "PLOT_TOP_K": 3,
             "MODELS_NAMES": ["bert-base-uncased","bert-c4_200m","bert-efcamdat"],
             "FIG_WIDTH": 10,
             "FIG_HEIGHT": 8
@@ -202,6 +206,18 @@ if __name__ == "__main__":
     lexical_ref = json.loads(
                     pd.read_excel(config["LEXICAL_FP"]).to_json(orient="records")
                   )  
+    lexical_zipf_dict =  {
+            d['Word']:{
+                'zipf': d['Zipf-value'],
+                'freq': d['FREQcount'],
+                }for d in lexical_ref
+    }
+    tokens_not_in_lexicon = collections.defaultdict(int)
+    sorted_lexical_zipf = sorted(lexical_zipf_dict.items(),
+                                key=lambda tpl:tpl[1]['zipf'],
+                                reverse=True
+                                )
+
     with open(config["INPUT_FP"]) as inpf:
         masked_sentences = json.load(inpf)
 
@@ -216,6 +232,18 @@ if __name__ == "__main__":
             "intersection_matrix": None,
     }
     previous_text_pseudo_id = None
+    wordZip_kl_boxplot_data = collections.defaultdict(
+            lambda: []
+    )
+    wordZip_kl_ud_pos_boxplot_data=collections.defaultdict(lambda : 
+                   collections.defaultdict(lambda: [])
+    )
+    wordFreq_kl_boxplot_data = collections.defaultdict(
+            lambda: []
+    )
+    wordFreq_kl_ud_pos_boxplot_data=collections.defaultdict(lambda : 
+                   collections.defaultdict(lambda: [])
+    )
     cefr_kl_boxplot_data= {
             'A1': [],
             'A2': [],
@@ -329,13 +357,27 @@ if __name__ == "__main__":
         kl_metric_matrix = kl_matrix(models_names, models_predictions)
         try:
             arbitrary_kl_metric = kl_metric_matrix[0][2] + kl_metric_matrix[2][0]
-            cefr_kl_boxplot_data[text_cefr].append(arbitrary_kl_metric)
-            cefr_kl_ud_pos_boxplot_data[masked_token_ud_pos][text_cefr].append(arbitrary_kl_metric)
-            voc_range_kl_boxplot_data[text_vocab_range].append(arbitrary_kl_metric)
-            voc_range_kl_ud_pos_boxplot_data[masked_token_ud_pos][text_vocab_range].append(arbitrary_kl_metric)
         except:
-           bug_errors_count['missing_predictions'] += 1
-
+            continue
+        cefr_kl_boxplot_data[text_cefr].append(arbitrary_kl_metric)
+        cefr_kl_ud_pos_boxplot_data[masked_token_ud_pos][text_cefr].append(arbitrary_kl_metric)
+        voc_range_kl_boxplot_data[text_vocab_range].append(arbitrary_kl_metric)
+        voc_range_kl_ud_pos_boxplot_data[masked_token_ud_pos][text_vocab_range].append(arbitrary_kl_metric)
+        lexical_dict = lexical_zipf_dict.get(masked_token_str.lower(), None)
+        if not (lexical_dict is None):
+            zipf_value = lexical_dict['zipf'] 
+            freq_value = lexical_dict['freq'] 
+            zipf_category = zipf_value // 0.5 
+            freq_category = freq_value // 1e5  
+            # str(zipf_value // 0.5)
+            # str(int(zipf_value))
+            # str(round(zipf_value, 1))
+            wordZip_kl_boxplot_data[1/(zipf_category+1)].append(arbitrary_kl_metric)
+            wordZip_kl_ud_pos_boxplot_data[masked_token_ud_pos][1/(zipf_category+1)].append(arbitrary_kl_metric)
+            wordFreq_kl_boxplot_data[1/(freq_category+1)].append(arbitrary_kl_metric)
+            wordFreq_kl_ud_pos_boxplot_data[masked_token_ud_pos][1/(freq_category+1)].append(arbitrary_kl_metric)
+        else:
+            tokens_not_in_lexicon[masked_token_str] += 1
         ############################################
         ##                                        ##
         ##    text level metrics                  ##

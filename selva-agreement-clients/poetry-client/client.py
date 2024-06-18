@@ -6,8 +6,10 @@ import json
 import numpy as np
 import nltk
 import time
-from datetime import datetime
 import spacy_udpipe
+from datetime import datetime
+from multiprocessing import Pool
+
 
 
 
@@ -57,7 +59,8 @@ def cls_to_dict(obj):
     key_value_tpls = [(a,getattr(obj, a)) for a in dir(obj) if not a.startswith('__')]
     return dict(key_value_tpls)
 
-def pos_annotate_prediction(prediction_dict, masked_sentence_tokens, token_idx):
+def pos_annotate_prediction(params_dict):
+    prediction_dict, masked_sentence_tokens, token_idx = params_dict.values()
     masked_sentence_tokens[token_idx] = prediction_dict["token_str"]
     simulated_text = " ".join(masked_sentence_tokens) 
     prediction_dict["ud_pos"] = dataset.tokenize_text(simulated_text, config['ud_model'])[token_idx].pos_
@@ -112,7 +115,7 @@ def main(config):
         for token_idx, token in enumerate(tokenizedText):
             maskedTokenId = f"{row_metadata['pseudo']}_{token_idx}"
             if loop_count % 10 == 0:
-                print(f'processing 100 masked sentences took : {time.time() - loop_start} seconds')
+                print(f'processing 10 masked sentences took : {time.time() - loop_start} seconds')
                 loop_start=time.time()
 
             if partial_processed_dict.get(maskedTokenId, False):
@@ -142,19 +145,23 @@ def main(config):
                     with open(processed_error_log,"a") as errorf:
                         errorf.write(llm_masked_sentence+'\n')
                     continue
+                prediction_end_time = time.time()
+
+                pos_start_time = time.time()
+
+                params = [{
+                    "prediction_dict":{ k: v for k, v in pred_dict.items() if k not in ['sequence'] },
+                    "masked_sentence_tokens":masked_sentence_tokens,
+                    "token_idx":token_idx}
+                          for pred_dict in llm_masked_sentence_predictions[:config['top_k']]]
+
+                with Pool(24) as p:
+                    annotated_predictions = p.map(pos_annotate_prediction,params)
 
                 models_predictions.append({
-                    'model_name': config['models_fps'][model_idx],
-                    'predictions': [
-                        pos_annotate_prediction({
-                                k: v
-                        for k, v in d.items()
-                        if k not in ['sequence']
-                        }, 
-                        masked_sentence_tokens,
-                        token_idx) for d in llm_masked_sentence_predictions[:config['top_k']]
-                    ]
-                    })
+                    'model_name':  config['models_fps'][model_idx],
+                    'predictions': annotated_predictions
+                })
             data = {
                     'metadata': row_metadata,
                     'predictions': {
@@ -198,7 +205,7 @@ if __name__ == '__main__':
     config = {
         'dataset_fp': './outputs/selva-learner-predictions',
         'input_fp' : './outputs/CELVA/celvasp_english_annotated_with_metadata_2018_2023_both_splits_feb2024.csv',
-        'partial_fp': './outputs/selva-learner-predictions_2024-6-13_16:18:18.json',
+        'partial_fp': "./outputs/selva-learner-predictions_2024-6-17_16:41:38.json",0#'./outputs/selva-learner-predictions_2024-6-14_20:57:31.json',
         'expected_metadata': [
             'Date_ajout', 'pseudo', 'Voc_range', 'CECRL',
             'nb_annees_L2', 'L1', 'Domaine_de_specialite',
