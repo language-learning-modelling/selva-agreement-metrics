@@ -81,7 +81,7 @@ def main(config):
 
     start=datetime.utcnow()
     start_str = f'{start.year}-{start.month}-{start.day}_{start.hour}:{start.minute}:{start.second}'
-    processed_file_fp = f'{config["dataset_fp"]}_{start_str}.json'
+    processed_file_fp = f'{config["dataset_fp"]}_{start_str}_topk_{config["top_k"]}.json'
     write_batch = []
     prediction_batch = []
     print(f'saving processed file in {processed_file_fp}') 
@@ -107,6 +107,8 @@ def main(config):
     models_tpl = models.load_list_of_models(config['models_fps'])
     maxNumOfMasks = 3
     loop_count = 0
+    loop_print_step = 100
+    loop_write_batch_step = 1000
     loop_start = time.time()
     with open(processed_error_log,"w") as errorf:
         pass
@@ -114,8 +116,8 @@ def main(config):
         row_metadata = row_dicts[text_idx]
         for token_idx, token in enumerate(tokenizedText):
             maskedTokenId = f"{row_metadata['pseudo']}_{token_idx}"
-            if loop_count % 10 == 0:
-                print(f'processing 10 masked sentences took : {time.time() - loop_start} seconds')
+            if loop_count % loop_print_step == 0:
+                print(f'processing {loop_print_step} masked token sentences took : {time.time() - loop_start} seconds')
                 loop_start=time.time()
 
             if partial_processed_dict.get(maskedTokenId, False):
@@ -141,7 +143,8 @@ def main(config):
                             model=model,
                             tokenizer=tokenizer,
                             top_k=config['top_k']) 
-                except:
+                except Exception as e:
+                    print(e);input()
                     with open(processed_error_log,"a") as errorf:
                         errorf.write(llm_masked_sentence+'\n')
                     continue
@@ -177,18 +180,20 @@ def main(config):
                         },
                        'tokens': {
                         },
-                       'models_predictions':['''
+                       'models_predictions':[
+                        ]
+                    }
+            }
+            '''
                             {
                             'model_name': d['model_name'],
                             'predictions_annotations': [{
                                 'idx': idx
                             } for idx in range(len(d['predictions']))],
-                            } for d in models_predictions''' 
-                        ]
-                    }
-            }
+                            } for d in models_predictions
+            ''' 
             write_batch.append(data)
-            if len(write_batch) >= 100:
+            if len(write_batch) >= loop_write_batch_step:
                 write_obj(write_batch, outfp=processed_file_fp, batch=True)
                 end=datetime.utcnow()
                 print(f'*'*100)
@@ -205,7 +210,10 @@ if __name__ == '__main__':
     config = {
         'dataset_fp': './outputs/selva-learner-predictions',
         'input_fp' : './outputs/CELVA/celvasp_english_annotated_with_metadata_2018_2023_both_splits_feb2024.csv',
-        'partial_fp': "./outputs/selva-learner-predictions_2024-6-17_16:41:38.json",0#'./outputs/selva-learner-predictions_2024-6-14_20:57:31.json',
+        'partial_fp':'./outputs/selva-learner-predictions_2024-6-20_18:14:11_topk_5.json', 
+        #"",
+        #
+        #'./outputs/selva-learner-predictions_2024-6-14_20:57:31.json',
         'expected_metadata': [
             'Date_ajout', 'pseudo', 'Voc_range', 'CECRL',
             'nb_annees_L2', 'L1', 'Domaine_de_specialite',
@@ -222,7 +230,7 @@ if __name__ == '__main__':
             #'distilbert-base-uncased',
             #'xlm-roberta-large'
             ],
-        'top_k': 100, 
+        'top_k': 5, 
         'ud_model_fp': './udpipe_models/english-ewt-ud-2.5-191206.udpipe'
     }
 

@@ -188,7 +188,7 @@ def calculate_learner_behavior_metrics(models_predictions, learner_actual_token_
 
 if __name__ == "__main__":
     config = {
-            "INPUT_FP": "./outputs/selva-learner-predictions_2024-6-17_16:41:38.json",
+            "INPUT_FP": "./outputs/selva-learner-predictions_2024-6-20_18:14:11_topk_5.json",
             #"./outputs/selva-learner-predictions_2024-6-6_14:24:5.json",
             #"./outputs/CELVA/celva-predictions.json",
             # "outputs/selva-learner-predictions_2024-6-14_20:57:31.json",

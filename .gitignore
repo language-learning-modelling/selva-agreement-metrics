@@ -10,3 +10,5 @@ selva-agreement-clients/poetry-client/selva_dataset/
 selva-agreement-clients/poetry-client/sample_for_analytics.json
 selva-agreement-clients/poetry-client/outputs
 selva-agreement-clients/poetry-client/__pycache__/
+selva-agreement-clients/poetry-client/celva.sp_full_dataset.json
+selva-agreement-clients/poetry-client/calibCurvmodels.pdf
