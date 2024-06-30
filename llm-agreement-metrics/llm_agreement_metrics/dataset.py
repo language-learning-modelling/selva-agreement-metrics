@@ -50,8 +50,7 @@ def clean_text(rowText):
     cleanedText=rowText
     return cleanedText
 
-def tokenize_text(cleanedText,
-                  model):
+def tokenize_text(param_dict):
     '''
         INPUT:
             cleanedText : str
@@ -59,6 +58,7 @@ def tokenize_text(cleanedText,
         OUTPUT:
             [Tokens]
     '''
+    cleanedText, model = param_dict.values()
     doc = model(cleanedText)
     tokens = [ token for token in doc ]
     return tokens 
@@ -75,18 +75,26 @@ def read_dataset_pandas(
     records = dataset.reset_index().to_dict(orient='records')
     return records
 
-def read_dataset(filepath):
+def read_dataset_txt(filepath):
+    dicts = []
     with open(filepath) as inpf:
-        columns_name = next(inpf).replace('\n','').split(',')
-        rows=[]
-        row_content=''
         for line in inpf:
-            row_content += line
-            if re.search('",[01]$', line):
-                rows.append(row_content)
-                row_content=''
+            line = line.replace("\n","")
+            data = {
+                    "text": line
+            }
+            dicts.append(data)
+    return dicts
 
-        for row_idx, row in enumerate(csv.reader(rows, quotechar='"', delimiter=',',
-                     quoting=csv.QUOTE_ALL, skipinitialspace=True)):
-            if len(row) != 17:
-                input()
+def read_dataset(filepath):
+    if ".csv" in filepath:
+        dicts = read_dataset_pandas(
+                filepath, 
+                targetL2=['Anglais']
+                       )
+        return dicts 
+    else:
+        dicts = read_dataset_txt(
+                filepath 
+                )
+    return dicts

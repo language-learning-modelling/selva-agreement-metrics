@@ -69,7 +69,9 @@ def pos_annotate_prediction(params_dict):
 def main(config):
     main_start=datetime.utcnow()
     print(f'main script: {main_start.year}-{main_start.month}-{main_start.day}_{main_start.hour}:{main_start.minute}:{main_start.second}')
-    row_dicts = dataset.read_dataset_pandas(config['input_fp'])
+    global row_dicts
+    row_dicts = dataset.read_dataset(config['input_fp'])[:10]
+    text_column = 'text'#'Texte_etudiant'
     if config.get('partial_fp', False) and os.path.exists(config['partial_fp']):
         partial_processed_dict = json.load(open(config['partial_fp']))
     elif config.get('partial_fp', False) and not os.path.exists(config['partial_fp']):
@@ -95,9 +97,10 @@ def main(config):
     processed_error_log =f"./outputs/error_log_{start_str}"
 
 
-    cleanedTexts = [ dataset.clean_text(d['Texte_etudiant'])
+    cleanedTexts = [ dataset.clean_text(d[text_column])
                         for d in row_dicts ]
         
+    global tokenizedTexts 
     tokenizedTexts = [ dataset.tokenize_text(cleanedText, config['ud_model'])
                         for cleanedText in cleanedTexts ] 
 
@@ -115,7 +118,8 @@ def main(config):
     for text_idx, tokenizedText in enumerate(tokenizedTexts):
         row_metadata = row_dicts[text_idx]
         for token_idx, token in enumerate(tokenizedText):
-            maskedTokenId = f"{row_metadata['pseudo']}_{token_idx}"
+            text_id = row_metadata['pseudo'] if row_metadata.get('pseudo') else text_idx 
+            maskedTokenId = f"{text_id}_{token_idx}"
             if loop_count % loop_print_step == 0:
                 print(f'processing {loop_print_step} masked token sentences took : {time.time() - loop_start} seconds')
                 loop_start=time.time()
@@ -138,11 +142,15 @@ def main(config):
                 llm_masked_sentence = llm_masked_sentences[0]
                 start=time.time()
                 try:
+                    start=time.time()
                     llm_masked_sentence_predictions = dataset.fill_masks_pipeline(
                             [llm_masked_sentence],
                             model=model,
                             tokenizer=tokenizer,
-                            top_k=config['top_k']) 
+                            top_k=len(tokenizer.vocab)
+                            ) #config['top_k']) 
+                    print(time.time()-start)
+                    exit()
                 except Exception as e:
                     print(e);input()
                     with open(processed_error_log,"a") as errorf:
@@ -152,6 +160,7 @@ def main(config):
 
                 pos_start_time = time.time()
 
+                '''
                 params = [{
                     "prediction_dict":{ k: v for k, v in pred_dict.items() if k not in ['sequence'] },
                     "masked_sentence_tokens":masked_sentence_tokens,
@@ -160,10 +169,10 @@ def main(config):
 
                 with Pool(24) as p:
                     annotated_predictions = p.map(pos_annotate_prediction,params)
-
+                '''
                 models_predictions.append({
                     'model_name':  config['models_fps'][model_idx],
-                    'predictions': annotated_predictions
+                    'predictions': llm_masked_sentence_predictions#annotated_predictions
                 })
             data = {
                     'metadata': row_metadata,
@@ -174,14 +183,6 @@ def main(config):
                         'maskedTokenIdx': token_idx, 
                         'maskedTokenStr': token['token_str'],
                         'models': models_predictions
-                    },
-                    'linguistic_annotations': {
-                       'sentence': {
-                        },
-                       'tokens': {
-                        },
-                       'models_predictions':[
-                        ]
                     }
             }
             '''
@@ -208,9 +209,10 @@ def main(config):
                
 if __name__ == '__main__':
     config = {
-        'dataset_fp': './outputs/selva-learner-predictions',
-        'input_fp' : './outputs/CELVA/celvasp_english_annotated_with_metadata_2018_2023_both_splits_feb2024.csv',
-        'partial_fp':'./outputs/selva-learner-predictions_2024-6-20_18:14:11_topk_5.json', 
+        'dataset_fp': './outputs/efcamdat-predictions', # selva-learner-predictions
+        'input_fp' : './outputs/EFCAMDAT/test_cleaned_efcamdat__all.txt',  
+        #'./outputs/CELVA/celvasp_english_annotated_with_metadata_2018_2023_both_splits_feb2024.csv',
+        'partial_fp':'', 
         #"",
         #
         #'./outputs/selva-learner-predictions_2024-6-14_20:57:31.json',
