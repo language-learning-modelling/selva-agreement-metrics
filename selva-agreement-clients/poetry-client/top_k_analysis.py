@@ -19,15 +19,39 @@ import srsly
 MAXK=100
 top_k_count = collections.defaultdict(lambda: collections.defaultdict(int))
 confusion_matrix = collections.defaultdict(lambda: collections.defaultdict(int)) 
+TARGET_MODEL_NAME="roberta-base"
+#"bert-base-uncased"
+#"bert-base-uncased-c4200m-unchaged-vocab-73640000"
+#"bert-base-uncased"
+DATASET="EFCAMDAT"
+SPLIT="test"
+DATA_FOLDERPATH=f"/home/berstearns/projects/language-learning-modelling/selva-agreement-metrics/selva-agreement-clients/poetry-client/outputs/"
 total_n_tokens = 0
-cefr_column="cefr" 
+CEFR_COLUMN="cefr" 
 #"CECRL"
 #"cefr" 
-efcamdat_test_files = [
+expected_roberta_efcamdat_test_files = [
+    "test_cleaned_efcamdat__all_segment_aa.json_roberta-base.json.gz",
+    "test_cleaned_efcamdat__all_segment_ab.json_roberta-base.json.gz",
+    "test_cleaned_efcamdat__all_segment_ac.json_roberta-base.json.gz",
+    "test_cleaned_efcamdat__all_segment_ad.json_roberta-base.json.gz",
+    "test_cleaned_efcamdat__all_segment_ae.json_roberta-base.json.gz",
+    "test_cleaned_efcamdat__all_segment_af.json_roberta-base.json.gz",
+    "test_cleaned_efcamdat__all_segment_ag.json_roberta-base.json.gz",
+    "test_cleaned_efcamdat__all_segment_ah.json_roberta-base.json.gz",
+    "test_cleaned_efcamdat__all_segment_ai.json_roberta-base.json.gz",
+    "test_cleaned_efcamdat__all_segment_aj.json_roberta-base.json.gz",
+    "test_cleaned_efcamdat__all_segment_ak.json_roberta-base.json.gz",
+    "test_cleaned_efcamdat__all_segment_al.json_roberta-base.json.gz",
+    "test_cleaned_efcamdat__all_segment_am.json_roberta-base.json.gz",
+    "test_cleaned_efcamdat__all_segment_an.json_roberta-base.json.gz",
+    "test_cleaned_efcamdat__all_segment_ao.json_roberta-base.json.gz"
+]
+expected_bert_efcamdat_test_files = [
     "test_cleaned_efcamdat__all_segment_aa.json_bert-base-uncased.json.gz",
     "test_cleaned_efcamdat__all_segment_ab.json_bert-base-uncased.json.gz",
     "test_cleaned_efcamdat__all_segment_ac.json_bert-base-uncased.json.gz",
-    #"test_cleaned_efcamdat__all_segment_ad.json_maskedsentences.json_bert-base-uncased.json.compact",
+    #"test_cleaned_efcamdat__all_segment_ad.json_maskedsentences.json_bert-base-uncased.json.gz",
     "test_cleaned_efcamdat__all_segment_ae.json_bert-base-uncased.json.gz",
     #"test_cleaned_efcamdat__all_segment_af.json_maskedsentences.json_bert-base-uncased.json.compact",
     #"test_cleaned_efcamdat__all_segment_ag.json_maskedsentences.json_bert-base-uncased.json.compact",
@@ -40,16 +64,10 @@ efcamdat_test_files = [
     "test_cleaned_efcamdat__all_segment_an.json_bert-base-uncased.json.gz",
     "test_cleaned_efcamdat__all_segment_ao.json_bert-base-uncased.json.gz"
 ]
-celva_files = [
-        "celva_texts.json_maskedsentences.json_bert-base-uncased.json"
+expected_bert_celva_files = [
+        "_celva_texts.json_maskedsentences.json_bert-base-uncased.json"
         ]
-dataset_model_files = efcamdat_test_files
-#"bert-base-uncased-c4200m-unchaged-vocab-73640000"
-#"bert-base-uncased"
-TARGET_MODEL_NAME="bert-base-uncased"
-DATASET="EFCAMDAT"
-SPLIT="test"
-DATA_FOLDERPATH=f"/home/berstearns/projects/language-learning-modelling/selva-agreement-metrics/selva-agreement-clients/poetry-client/outputs/"
+dataset_model_files = expected_roberta_efcamdat_test_files
 for filename in dataset_model_files:
     print(filename)
     relative_fp=f"{DATASET}/finalized/{TARGET_MODEL_NAME}/{filename}"
@@ -68,7 +86,7 @@ for filename in dataset_model_files:
             print("-"*50)
             continue
         for text_id, text_dict in text_dicts_dict.items(): 
-            cefr_level = text_dict["text_metadata"][cefr_column]
+            cefr_level = text_dict["text_metadata"][CEFR_COLUMN]
             for token_dict in text_dict["tokens"]:
                 token_has_prediction = token_dict["predictions"]["models"].get(TARGET_MODEL_NAME,False)
                 if not token_has_prediction:
