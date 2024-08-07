@@ -6,22 +6,32 @@ from statistics import median
 
 def calc(data):
     if len(data) > 1:
-        median(data)
+        return median(data)
+    else:
+        return None
+
 def groups_box_plot(plot_data):
-    median_per_group = { cefr: calc(data) for cefr,data in plot_data.items()}
+    #median_per_group = { cefr: calc(data) for cefr,data in plot_data.items()}
     print(plot_data)
     sorted_keys, sorted_vals = zip(*sorted(plot_data.items(), key=op.itemgetter(0)))
+    median_per_group = [round(calc(data),2) for data in sorted_vals]
     print(sorted_keys)
 
 
     sns.set(context="notebook", style='whitegrid')
-    sns.utils.axlabel(xlabel="Groups", ylabel="KL-metric per Masked Token in a  Sentence")
-    sns.boxplot(
-            data=sorted_vals, width=0.10
+    sns.utils.axlabel(xlabel="Groups", ylabel="KL metric per Masked Token")
+    box_plot = sns.boxplot(
+            data=sorted_vals, width=0.10,
+            showfliers=False,
+            showcaps=False,
+            whiskerprops={'visible':False}
             )
-    # sns.swarmplot(data=sorted_vals, size=6, edgecolor="black", linewidth=0.9)
+    for xtick in box_plot.get_xticks():
+        box_plot.text(xtick,median_per_group[xtick] + 0.08 ,median_per_group[xtick], 
+                horizontalalignment='center',size='x-small',color='black',weight='semibold')
     print(f"medians per group", median_per_group)
     plt.xticks(plt.xticks()[0], sorted_keys)
+    plt.ylim(0,2.5)
     plt.show()
 
 def sorted_histogram(sorted_freq_tpls):
