@@ -1,5 +1,5 @@
 import re
-import csv
+import json
 import pandas as pd
 import nltk
 import spacy_udpipe
@@ -76,15 +76,18 @@ def read_dataset_pandas(
     return records
 
 def read_dataset_txt(filepath):
-    dicts = []
+    dict_of_dicts = {}
     with open(filepath) as inpf:
-        for line in inpf:
+        for txt_idx, line in enumerate(inpf):
             line = line.replace("\n","")
             data = {
                     "text": line
             }
-            dicts.append(data)
-    return dicts
+            dict_of_dicts[txt_idx] = data
+    return dict_of_dicts
+
+def read_dataset_json(filepath):
+    return json.load(open(filepath))
 
 def read_dataset(filepath):
     if ".csv" in filepath:
@@ -93,6 +96,10 @@ def read_dataset(filepath):
                 targetL2=['Anglais']
                        )
         return dicts 
+    elif ".json" in filepath:
+        dicts = read_dataset_json(
+                filepath 
+                )
     else:
         dicts = read_dataset_txt(
                 filepath 
