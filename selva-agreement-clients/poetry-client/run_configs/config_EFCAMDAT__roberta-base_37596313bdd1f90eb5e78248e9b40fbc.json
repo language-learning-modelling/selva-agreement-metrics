@@ -1,0 +1,17 @@
+{
+    "target_model_name": "roberta-base",
+    "dataset": "EFCAMDAT",
+    "data_folderpath": "/home/berstearns/projects/language-learning-modelling/selva-agreement-metrics/selva-agreement-clients/poetry-client/outputs/",
+    "cefr_column": "cefr",
+    "max_k": 100,
+    "split": "",
+    "config_hash": "37596313bdd1f90eb5e78248e9b40fbc",
+    "TARGET_MODEL_NAME": "roberta-base",
+    "DATASET": "EFCAMDAT",
+    "DATA_FOLDERPATH": "/home/berstearns/projects/language-learning-modelling/selva-agreement-metrics/selva-agreement-clients/poetry-client/outputs/",
+    "CEFR_COLUMN": "cefr",
+    "MAX_K": 100,
+    "SPLIT": "",
+    "CONFIG_HASH": null,
+    "TARGET_MODEL_FOLDERPATH": "/home/berstearns/projects/language-learning-modelling/selva-agreement-metrics/selva-agreement-clients/poetry-client/outputs//EFCAMDAT/finalized/roberta-base/"
+}

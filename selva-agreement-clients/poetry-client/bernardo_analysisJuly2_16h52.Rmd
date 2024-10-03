@@ -1,0 +1,615 @@
+---
+title: "bernardo"
+author: "Andrew Simpkin + NB"
+date: "`r Sys.Date()`"
+output: html_document
+---
+
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+suppressPackageStartupMessages({
+library(tidyverse)
+library(stringdist)
+library(stringi)
+library(cleanNLP)
+library(jsonlite)
+library(xtable)
+})
+
+options(dplyr.summarise.inform = FALSE)
+options(width = 120)
+theme_set(theme_minimal())
+cnlp_init_udpipe()
+```
+
+
+```{r}
+###############################################################
+# JSON=>CSV (Taylor Arnold fecit)
+
+jtext <- read_lines("celva.sp_full_dataset.json")
+#jtext <- read_lines("../data/selva_full_dataset(3).json")
+jtext <- stri_replace_all(jtext, "null", fixed = "NaN")
+jd <- jsonlite::fromJSON(jtext)
+
+df <- vector('list', length(jd))
+for (j in seq_along(jd)){
+  z <- jd[[j]]
+  mods <- z$predictions$models
+  temp <- bind_rows(mods$predictions)
+  temp$model <- rep(mods$model_name, each = 3)
+  temp$rank <- rep(1:3, 3)  
+  for (nom in names(jd[[j]]$metadata))
+  {
+    temp[[nom]] <- jd[[j]]$metadata[[nom]]
+  }
+  temp$name <- names(jd)[j]
+  temp$maskedToken_token_str <- z$predictions$maskedToken$token_str
+  temp$maskedToken_ud_pos <- z$predictions$maskedToken$ud_pos
+  temp$maskedSentenceStr <- z$predictions$maskedSentenceStr
+  temp$maskedTokenIdx <- z$predictions$maskedTokenIdx
+  temp$maskedTokenStr <- z$predictions$maskedTokenStr
+  df[[j]] <- as_tibble(temp)
+}
+df <- bind_rows(df)
+df <- select(df, name, everything())
+
+# adding a success variable when the token has been predicted by the LLM
+df$success <- as.numeric(df$token_str == df$maskedTokenStr)
+```
+
+
+# to explore failures by rank 
+failed = df %>% filter(success == 0 & rank == 1) %>%
+  select(model, rank, success, score)
+prop.table(table(failed$model)) # for rank 1
+
+failed2 <- df %>% filter(success == 0 & rank == 2)
+prop.table(table(failed2$model)) # for rank 2
+
+
+```{r}
+success <- df %>% filter(success == 1)
+prop.modl <- prop.table(table(success$model))
+
+# Define table caption (optional)
+table_caption3 <- "Proportions of exact tokens predicted by the different models"
+
+# Create xtable object with basic formatting
+xtable(prop.modl, caption = table_caption3)
+
+# Print the LaTeX code (use cat() to write to a file)
+cat(print(xtable(prop.modl, caption = table_caption3), include.rownames = FALSE, include.colnames = TRUE), file = "my_propmodl.tex")
+
+```
+
+
+# to be done
+# what are the UPOS that are maximally predicted by the different models ?
+
+
+```{r}
+failed = df %>% filter(success == 0 & rank == 1 & model == "../models/bert-base-uncased-fullefcamdat/") %>%
+  select(model, rank, success, score)
+
+
+failed %>% ggplot(aes(x=score)) + geom_density()
+
+# Select number of clusters
+k <- 3
+set.seed(12345)
+# Build model with k clusters
+km.out <- kmeans(failed$score, centers = 2)
+
+install.packages("factoextra",dependencies = TRUE)
+library(factoextra)
+failed$cluster <- factor(km.out$cluster)
+
+failed %>%
+  na.omit() %>%
+  ggplot(aes(x=cluster, y = score, fill = cluster)) + 
+  geom_boxplot(varwidth = FALSE) + theme_bw() + 
+  theme(axis.text.x = element_text(angle = 0, hjust=1)) + 
+  labs(title = "Prob by clusters", x ="Predicted prob",fill = "Cluster")
+
+```
+
+Plot the probabilities for candidates (success and failed)
+```{r}
+
+df %>%
+  mutate(rank = as.factor(rank)) %>%
+  ggplot(aes(fill = rank, x = score)) + 
+  geom_density(alpha = 0.5) + theme_bw() + 
+  facet_wrap(~model)
+
+
+library(Cairo)
+# Step 1: Call the pdf command to start the plot
+CairoPDF("ProbDensityPerUPOSrank1.pdf", 6, 6, bg="transparent")
+#pdf(file = "calibCurvmodels.pdf", width = 4,height = 4)
+# Step 2: Create the plot with R code
+df %>%
+  filter(model == "../models/bert-base-uncased-fullefcamdat/" & rank == 1) %>%
+  mutate(rank = as.factor(rank)) %>%
+  ggplot(aes(fill = rank, x = score)) + 
+  geom_density(alpha = 0.5) + theme_bw() + 
+  facet_wrap(~ud_pos)
+# Step 3: Run dev.off() to create the file!
+dev.off()
+
+```
+
+
+
+#Plot the probabilities for successful candidates by rank
+
+```{r}
+
+library(Cairo)
+# Step 1: Call the pdf command to start the plot
+CairoPDF("ProbDensityperModel.pdf", 6, 6, bg="transparent")
+#pdf(file = "calibCurvmodels.pdf", width = 4,height = 4)
+# Step 2: Create the plot with R code
+
+df %>%
+  mutate(rank = as.factor(rank)) %>%
+  filter(success == 1) %>%
+  ggplot(aes(fill = rank, x = score)) + 
+  geom_density(alpha = 0.5) + theme_bw() + 
+  facet_wrap(~model)
+model_plot
+# Step 3: Run dev.off() to create the file!
+invisible(dev.off())
+#dev.off()
+
+```
+
+
+#Plot the probabilities for successful candidates, including 0 if none
+
+```{r}
+
+df %>%
+  mutate(rank = as.factor(rank)) %>%
+  filter(success == 1) %>%
+  ggplot(aes(x = score)) + 
+  geom_density(alpha = 0.5) + theme_bw() + 
+  facet_wrap(~model)
+
+```
+
+
+```{r}
+# some analyses (AS)--------
+
+# success rate of predicting the masked token
+df |>
+  filter(ud_pos == "ADP") |>
+  group_by(model, rank) |>
+  summarize(success_rate = mean(success),
+            score_mean = mean(score)) %>%
+  select(model, success_rate, score_mean, rank)
+
+# success rate of predicting the masked token
+df |>
+  group_by(model, rank) |>
+  summarize(success_rate = mean(success))
+
+# distinct average probabilities of the model predictions according to rank
+df |>
+  group_by(model, rank, success) |>
+  summarize(score_mean = mean(score)) 
+
+
+# probabilities per UPOS categories for successful predictions
+df |>
+  group_by(model, rank, ud_pos, success) |>
+  summarize(score_mean = mean(score)) |>
+  filter(rank == 1, success == 1) |>
+  arrange(model, score_mean) |>
+  print(n = Inf)
+
+
+# corresponding support (n) of probabilities per UPOS categories for successful predictions 
+df |>
+  group_by(model, rank, ud_pos) |>
+  summarize(success_rate = mean(success), n = n()) |>
+  filter(rank == 1) |>
+  arrange(model, success_rate) |>
+  print(n = Inf)
+
+
+#
+df |>
+  group_by(name, model, success) |>
+  summarize(score_sum = sum(score))  
+
+
+#maybe use dispersion....
+df |>
+  group_by(name, model) |>
+  filter(rank <= 2) |>
+  reframe(score, lag(score))
+#  summarize(score, lag(score))
+
+
+
+
+```
+
+```{r}
+library("knitr")
+library(xtable)
+# success rate of predicting the masked token
+my_matrix <- df |>
+  filter(ud_pos == "ADP") |>
+  group_by(model, rank) |>
+  summarize(success_rate = mean(success),
+            score_mean = mean(score)) %>%
+  select(model, success_rate, score_mean, rank)
+
+# Define table caption (optional)
+table_caption <- "Model performance for prepostions"
+
+# Create xtable object with basic formatting
+xtable(my_matrix, caption = table_caption)
+
+# Print the LaTeX code (use cat() to write to a file)
+cat(print(xtable(my_matrix, caption = table_caption), include.rownames = FALSE, include.colnames = TRUE), file = "my_table.tex")
+
+```
+
+
+# @in my family  i took graet care of my cousins I helped them with their homeworkand I realized that I absolutely wanted to work whir children ; after this I  have decided to pass my BAFA."
+#"I absolutely wanted to work whir children" 
+#to work whir 
+#=whir
+# predictions for misspelling
+ 
+```{r, Discussion : role of spelling}
+#whir <- df[df$maskedToken_token_str=="whir",df$token_str]
+whir <- df$token_str[df$maskedToken_token_str=="whir"]
+graet <- df$token_str[df$maskedToken_token_str=="great"]
+graet
+```
+
+
+
+```{r}
+# to do  use hunspell to detect spelling errors in R 
+# to do  when rank correlates with rank appropriateness
+hunspell_suggest(words, dict = dictionary("en_US"))
+hunspell_suggest(df$words, dict = dictionary("en_US"))
+
+install.packages("hunspell")
+library(hunspell)
+
+# Define a vector of text strings
+#texts <- c("This is the frst text.", "Here is anothr exmple with erors.")
+
+texts <- unique(df$maskedToken_token_str)
+head(texts)
+# Detect spelling errors in each text string
+misspelled_words <- lapply(texts, hunspell_check) # FALSE for spelling mistakes
+misspelled_words <- lapply(texts, hunspell_parse) # outputs the proper spelling
+misspelled_words <- lapply(texts, hunspell_suggest) # outputs suggestions for  proper spelling
+
+
+# Print the misspelled words for each text string
+print(misspelled_words)
+#print(head(misspelled_words,10))
+
+
+# Define a vector of text strings
+texts <- c("This is the frst text.", "Here is anothr exmple with erors.")
+
+# Detect spelling errors in each text string
+misspelled_words <- lapply(texts, hunspell)
+
+# Print the misspelled words for each text string
+print(misspelled_words)
+
+## create a success.sp variable that corrects spelling
+df$success.sp <- as.numeric(df$token_str == df$maskedTokenStr)
+
+hunspell_suggest(df$maskedTokenStr, dict = dictionary("en_US"))[1]
+
+
+
+```
+
+
+#if FALSE then 
+#hunspell_suggest(df$maskedTokenStr, dict = dictionary("en_US"))[1]
+
+df$spelling_error <- hunspell_check(df$maskedTokenStr, dict = dictionary("en_US"))
+table(df$spelling_error)
+#FALSE  TRUE 
+#2772 17163 
+
+# 2772/17163 
+0.1615102
+more than 16% of the learners contain spelling mistakes, but 
+citation("hunspell")
+Can we manage to predict/simulate spelling mistakes
+-> for models, report how sensitive they are to spelling variant
+
+words <- c("beer", "wiskey", "wine")
+correct <- hunspell_check(words)
+print(correct)
+
+
+```{r}
+# Calibration Curves per models--------
+
+# success rate of predicting the masked token
+library(readr)
+library(probably)
+library(ggplot2)
+
+
+
+# plot combining models
+model_plot <- cal_plot_breaks(df,success,score,.by="model") + 
+  ggplot2::geom_ribbon(
+    aes(ymin = lower, ymax = upper, fill = model,color = model),alpha=0.25) +
+  ggplot2::geom_line(aes(x=predicted_midpoint,y=event_rate,color=model),alpha=1) +
+  theme(text=element_text(size=20,  family="Times New Roman"),
+        plot.title = element_blank(),
+        legend.position.inside = c(0.9, 0.1),
+        legend.justification = c(1, 0)) +
+  labs(y = "Event Rate", x = "Model Probabilities") +
+  scale_color_viridis_d(labels = c("Bert-base", "C4200m","EFCAMDAT"),option='H') +
+  scale_fill_viridis_d(labels = c("Bert-base", "C4200m","EFCAMDAT"),option='H')
+```
+
+
+```{r}
+model_plot <- cal_plot_breaks(df,success,score,.by="model") + 
+  ggplot2::geom_ribbon(
+    aes(ymin = lower, ymax = upper, fill = model,color = model),alpha=0.25) +
+  ggplot2::geom_line(aes(x=predicted_midpoint,y=event_rate,color=model),alpha=1) +
+  theme(text=element_text(size=20,  family="Times New Roman"),
+        plot.title = element_blank(),
+        legend.position.inside = c(0.9, 0.1),
+        legend.justification = c(1, 0)) +
+  labs(y = "Event Rate", x = "Model Probabilities") +
+  scale_color_viridis_d(labels = c("Bert-base", "C4200m","EFCAMDAT"),option='H') +
+  scale_fill_viridis_d(labels = c("Bert-base", "C4200m","EFCAMDAT"),option='H')
+table(df$ud_pos)
+```
+
+
+
+```{r KL}
+#Notes for the computation of KL distance
+
+#kl.dist {seewave}
+install.packages("seewave")
+library(seewave)
+#kl.dist(tico1, tico2)    # log2 (binary logarithm)
+kl.dist(tico1, tico2, base=exp(1))  # ln (natural logarithm)
+df_1 <- df[df$rank=="1" & df$model=="bert-base-uncased",]
+```
+
+## COPY
+library(Cairo)
+# Step 1: Call the pdf command to start the plot
+CairoPDF("ProbDensityperModel.pdf", 6, 6, bg="transparent")
+#pdf(file = "calibCurvmodels.pdf", width = 4,height = 4)
+# Step 2: Create the plot with R code
+
+df %>%
+  mutate(rank = as.factor(rank)) %>%
+  filter(success == 1) %>%
+  ggplot(aes(fill = rank, x = score)) + 
+  geom_density(alpha = 0.5) + theme_bw() + 
+  facet_wrap(~model)
+# Step 3: Run dev.off() to create the file!
+#invisible(dev.off())
+dev.off()
+
+
+
+```{r}
+# average recall at k for rank = 1 (= accuracy)
+# divided by three because of the three models
+rank1 <- df |>
+#  group_by(model, rank, ud_pos) |>
+  filter(rank == 1 & success==1)
+recall_k1 <- table(rank1$model)/(nrow(df)/3)
+recall_k1
+```
+
+```{r}
+ # average recall at k for rank = 2
+rank2 <- df |>
+#  group_by(model, rank, ud_pos) |>
+  filter(rank == 2 & success==1)
+recall_k2 <- table(rank2$model)/(nrow(df)/3)
+recall_k2
+# recall at k=2 per model sums 
+recall_k2full <- (table(rank1$model)/(nrow(df)/3)+table(rank2$model)/(nrow(df)/3))
+recall_k2full
+rank3 <- df |>
+#  group_by(model, rank, ud_pos) |>
+  filter(rank == 3 & success==1)
+recall_k3 <- table(rank3$model)/(nrow(df)/3)
+recall_k3
+recall_k3full <- (table(rank1$model)+table(rank2$model)+table(rank3$model))/(nrow(df)/3)
+                                                                                                      
+recall_k3full <- (table(rank1$model)/(nrow(df)/3)+table(rank2$model)/(nrow(df)/3)+table(rank3$model)/(nrow(df)/3))
+recall_k3full
+
+recall <- as.matrix(cbind(recall_k1,recall_k2full,recall_k3full))
+recall
+
+# Define table caption (optional)
+table_caption2 <- "Average Recall at k for the different models"
+
+# Create xtable object with basic formatting
+xtable(recall, caption = table_caption2)
+
+# Print the LaTeX code (use cat() to write to a file)
+cat(print(xtable(recall, caption = table_caption2), include.rownames = FALSE, include.colnames = TRUE), file = "my_recall.tex")
+
+
+```
+
+
+# EXPLORATORY ANALYSIS on KL
+```{r}
+# ChatGPT code for KL: see the constraint on summin the three probs to 1
+# install.packages("entropy")
+# Load required package
+library(entropy)
+
+# Sample probability distributions from two models
+# These should be vectors of probabilities that sum to 1
+
+model.BERT <- df$score[df$model=="bert-base-uncased"] model_c4 <-  df$score[df$model=="../models/bert-base-uncased-c4200m-unchaged-vocab-73640000/"]
+model_efcamdat <-  df$score[df$model=="../models/bert-base-uncased-fullefcamdat/"] 
+
+# Ensure that the distributions are valid probability distributions
+if (sum(model1) != 1 || sum(model2) != 1) {
+  stop("Both models must be valid probability distributions.")
+}
+
+# Compute the KL divergence
+kl_divergence <- KL.empirical(model1, model2)
+
+# Print the result
+print(paste("KL Divergence: ", kl_divergence))
+
+# Ensure that the distributions are valid probability distributions
+if (sum(model1) != 1 || sum(model2) != 1) {
+  stop("Both models must be valid probability distributions.")
+}
+
+# Compute the KL divergence
+kl_divergence <- KL.empirical(model1, model2)
+
+# Print the result
+print(paste("KL Divergence: ", kl_divergence))
+
+```
+
+
+```{r}
+#Create a BERT only extraction and compute the sum of the three scores to plot it : RUBBISH CODE, use lag instead
+BERT <- df[df$model=="bert-base-uncased", ]
+plot(df$sumproba)
+BERT$sumproba2 <- NULL
+# Calculate the sums of successive triplets
+BERT$sumproba2 <- sapply(seq(1, nrow(df), by = 3), function(i) {
+  sum(BERT$score[i:(i+2)], na.rm = TRUE)
+})
+plot(BERT$sumproba2)
+summary(BERT$sumproba2)
+summary(BERT$score)
+# 
+```
+
+
+
+19935/3 # 6645 predictions
+table(df$model)
+#in R, write the script that computes the sum of three probabilities
+p4 value <- 1-p1-p2-p3
+if p4 <p3, include the data, else filter it
+
+
+# rename models for simplicity's sake?
+table(df$model)
+bert-base-uncased-c4200m-unchaged-vocab-73640000
+./models/bert-base-uncased-fullefcamdat/ 
+ bert-base-uncased
+ 
+ 
+```{r}
+# Initialize an empty vector to store the sums
+df$sumproba <- NULL
+#df$sumproba <- numeric()
+
+# Loop through the scores column in steps of 3
+for (i in seq(1, nrow(df), by = 3)) {
+  df$sumproba <- sum(df$score[i:(i+2)], na.rm = TRUE)
+#  triplet_sums <- c(triplet_sums, triplet_sum)
+}
+
+# Display the results
+#triplet_sums
+```
+
+
+
+# EXPLORATORY ANALYSIS : ROLE OF THE ESP domains in the contribution to  the predictions
+
+```{r}
+# Assuming df is your dataframe
+# Create a table of success counts
+table_success <- table(df.success$Domaine_de_specialite)
+
+# Create a table of total counts
+table_total <- table(df$Domaine_de_specialite)
+
+# Combine them into a matrix
+contingency_table <- rbind(table_success, table_total - table_success)
+rownames(contingency_table) <- c("Success", "Failure")
+
+# Print the contingency table to check
+print(contingency_table)
+
+# Perform the chi-squared test
+chi_squared_test <- chisq.test(contingency_table)
+
+# Print the results
+print(chi_squared_test)
+
+library("knitr")
+library(xtable)
+
+
+# save the contingency table as LaTeX
+# Define table caption (optional)
+table_caption <- "Contingency table of correct predictions per ESP domain (all models)"
+
+# Create xtable object with basic formatting
+xtable(contingency_table, caption = table_caption)
+# Print the LaTeX code (use cat() to write to a file)
+cat(print(xtable(contingency_table, caption = table_caption), include.rownames = TRUE, include.colnames = TRUE), file = "my_contingency_table.tex")
+
+```
+
+
+
+
+
+# switch: only 2 occ
+Is MaskedTokenIdx from  
+token_ID 
+sentence_ID
+df$index[1]
+table(df$index)
+table(unique(df$Texte_etudiant))
+
+# effect of conditional probability : what is the position of the mask?
+
+str(df)
+# regression modelling 
+```{r}
+# Fit the model
+model <- glm(success ~ nb_annees_L2 + ud_pos +Sejours_duree_semaines+Domaine_de_specialite  , data = df, family = binomial)
+# Summarize the model
+summary(model)
+# Make predictions
+probabilities <- model %>% predict(df, type = "response")
+predicted.classes <- ifelse(probabilities > 0.5, "pos", "neg")
+# Model accuracy
+mean(predicted.classes == df$success)
+summary(model)$coef
+
+```
+

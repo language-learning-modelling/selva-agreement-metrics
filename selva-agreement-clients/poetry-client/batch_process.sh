@@ -2,7 +2,7 @@
 # var for session name (to avoid repeated occurences)
 PYTHONBIN=/home/berstearns/.cache/pypoetry/virtualenvs/poetry-client-UVpoFPKR-py3.12/bin/python3
 SCRIPTFP=sent_tokenize.py
-MAX_NUM_TO_PROCESS=5
+MAX_NUM_TO_PROCESS=10
 sn=xyz
 
 # Start the session and window 0 in /etc
@@ -25,7 +25,7 @@ DATASPLITS=()
 ####################
 ## EFCAMDAT TRAIN ##
 ####################
-SPLIT="test"
+SPLIT="train"
 DATASET="EFCAMDAT"
 INPUT_BATCH_FOLDER="./outputs/${DATASET}/splits/${SPLIT}_json"
 OUTPUT_BATCH_FOLDER="./outputs/${DATASET}/tokenization_batch/${SPLIT}"
@@ -56,7 +56,8 @@ for i in ${!DATASPLITS[@]}; do
     jo -p input_fp=$FILEPATH ud_model_fp='./udpipe_models/english-ewt-ud-2.5-191206.udpipe' \
       output_folder=$OUTPUT_BATCH_FOLDER text_column='text'
   )
-  COMMAND="${PYTHONBIN} -i -W ignore ${SCRIPTFP} $CONFIG"
+  COMMAND="${PYTHONBIN} -W ignore ${SCRIPTFP} $CONFIG"
+  # -i
   echo $i "->" ${DATASPLITS[$i]}
   echo $CONFIG
   # echo $CONFIG

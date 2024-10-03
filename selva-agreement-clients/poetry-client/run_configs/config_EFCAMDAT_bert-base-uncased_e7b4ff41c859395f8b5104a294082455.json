@@ -1,0 +1,16 @@
+{
+    "target_model_name": "bert-base-uncased",
+    "dataset": "EFCAMDAT",
+    "data_folderpath": "/home/berstearns/projects/language-learning-modelling/selva-agreement-metrics/selva-agreement-clients/poetry-client/outputs/",
+    "cefr_column": "cefr",
+    "max_k": 100,
+    "split": "test",
+    "TARGET_MODEL_NAME": "bert-base-uncased",
+    "DATASET": "EFCAMDAT",
+    "DATA_FOLDERPATH": "/home/berstearns/projects/language-learning-modelling/selva-agreement-metrics/selva-agreement-clients/poetry-client/outputs/",
+    "CEFR_COLUMN": "cefr",
+    "MAX_K": 100,
+    "SPLIT": "test",
+    "TARGET_MODEL_FOLDERPATH": "/home/berstearns/projects/language-learning-modelling/selva-agreement-metrics/selva-agreement-clients/poetry-client/outputs//EFCAMDAT/finalized/bert-base-uncased/",
+    "CONFIGHASH": "e7b4ff41c859395f8b5104a294082455"
+}
