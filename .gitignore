@@ -12,3 +12,4 @@ selva-agreement-clients/poetry-client/outputs
 selva-agreement-clients/poetry-client/__pycache__/
 selva-agreement-clients/poetry-client/celva.sp_full_dataset.json
 selva-agreement-clients/poetry-client/calibCurvmodels.pdf
+selva-agreement-clients/poetry-client/.vim
